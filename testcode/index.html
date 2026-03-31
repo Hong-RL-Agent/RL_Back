@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>O/X 퀴즈</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-1: #020617;
+      --bg-2: #0f172a;
+      --bg-3: #111827;
+      --glass: rgba(255, 255, 255, 0.08);
+      --glass-strong: rgba(255, 255, 255, 0.14);
+      --border: rgba(255, 255, 255, 0.14);
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      --blue: #38bdf8;
+      --violet: #8b5cf6;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Pretendard", "Noto Sans KR", Arial, sans-serif;
+      color: var(--text-main);
+      background:
+        radial-gradient(circle at 10% 10%, rgba(56, 189, 248, 0.16), transparent 22%),
+        radial-gradient(circle at 85% 15%, rgba(139, 92, 246, 0.18), transparent 26%),
+        radial-gradient(circle at 50% 85%, rgba(34, 197, 94, 0.09), transparent 20%),
+        linear-gradient(135deg, var(--bg-1), var(--bg-2) 45%, var(--bg-3));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 32px 32px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,0.55), transparent);
+      pointer-events: none;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1240px;
+      display: grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      gap: 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .card {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-radius: 30px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.08), transparent 35%, transparent 70%, rgba(255,255,255,0.04));
+      pointer-events: none;
+    }
+
+    .hero {
+      padding: 42px;
+      min-height: 280px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      padding: 9px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      color: #bae6fd;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(36px, 5vw, 64px);
+      line-height: 1.02;
+      letter-spacing: -0.04em;
+      max-width: 760px;
+    }
+
+    .hero p {
+      margin: 18px 0 0;
+      color: var(--text-sub);
+      font-size: 17px;
+      line-height: 1.8;
+      max-width: 680px;
+    }
+
+    .hero-glow {
+      position: absolute;
+      right: -80px;
+      top: -60px;
+      width: 260px;
+      height: 260px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.22), transparent 65%);
+      filter: blur(10px);
+      pointer-events: none;
+    }
+
+    .side-panel {
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .info-card {
+      padding: 22px;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      position: relative;
+    }
+
+    .info-card h3 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+
+    .info-card p,
+    .info-card li {
+      color: var(--text-sub);
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+    }
+
+    .stat {
+      padding: 20px;
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .stat-label {
+      display: block;
+      color: var(--text-sub);
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .stat strong {
+      font-size: 30px;
+      letter-spacing: -0.03em;
+    }
+
+    .quiz-card {
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      justify-content: center;
+      grid-column: 1 / -1;
+    }
+
+    .quiz-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .quiz-meta {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .quiz-label,
+    .chip {
+      font-size: 14px;
+      color: #dbeafe;
+      font-weight: 700;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(59, 130, 246, 0.12);
+      border: 1px solid rgba(96, 165, 250, 0.18);
+    }
+
+    .chip.warn {
+      color: #fde68a;
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.2);
+    }
+
+    .progress-wrap {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .progress-bar {
+      width: 220px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .progress-fill {
+      width: 33.33%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--blue), var(--violet));
+      transition: width 0.25s ease;
+    }
+
+    .question-box {
+      padding: 32px;
+      border-radius: 26px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.05));
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      position: relative;
+    }
+
+    .question-title {
+      margin: 0 0 10px;
+      font-size: 14px;
+      color: #7dd3fc;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+    }
+
+    .question-text {
+      margin: 0;
+      font-size: clamp(24px, 3vw, 34px);
+      font-weight: 900;
+      line-height: 1.45;
+      letter-spacing: -0.03em;
+      max-width: 900px;
+    }
+
+    .button-group {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    button {
+      border: none;
+      border-radius: 22px;
+      font-size: clamp(20px, 3vw, 30px);
+      font-weight: 900;
+      padding: 24px 18px;
+      cursor: pointer;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease, filter 0.18s ease;
+      color: white;
+      position: relative;
+      overflow: hidden;
+    }
+
+    button::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.22), transparent 40%);
+      pointer-events: none;
+    }
+
+    button:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 16px 28px rgba(0, 0, 0, 0.24);
+      filter: brightness(1.05);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .btn-o { background: linear-gradient(135deg, #22c55e, #16a34a); }
+    .btn-x { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    .btn-next { background: linear-gradient(135deg, #3b82f6, #2563eb); font-size: 21px; }
+    .btn-theme { background: linear-gradient(135deg, #8b5cf6, #7c3aed); font-size: 21px; }
+
+    .utility-row {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 18px;
+    }
+
+    .result-box,
+    .history-box {
+      min-height: 130px;
+      padding: 24px;
+      border-radius: 24px;
+      background: rgba(15, 23, 42, 0.34);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .result-status,
+    .history-title {
+      display: inline-block;
+      font-size: 14px;
+      color: var(--text-sub);
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .result-message {
+      font-size: 29px;
+      font-weight: 900;
+      margin: 0;
+      letter-spacing: -0.03em;
+    }
+
+    .result-detail {
+      margin: 8px 0 0;
+      color: var(--text-sub);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .correct { color: #86efac; }
+    .wrong { color: #fca5a5; }
+
+    .history-list {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--text-sub);
+      line-height: 1.8;
+      font-size: 14px;
+      max-height: 120px;
+      overflow: auto;
+    }
+
+    .footer-note {
+      margin-top: auto;
+      color: #64748b;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    body.light-mode {
+      --text-main: #0f172a;
+      --text-sub: #475569;
+      background:
+        radial-gradient(circle at 10% 10%, rgba(56, 189, 248, 0.12), transparent 22%),
+        radial-gradient(circle at 85% 15%, rgba(139, 92, 246, 0.12), transparent 26%),
+        linear-gradient(135deg, #e2e8f0, #f8fafc 40%, #e0f2fe);
+    }
+
+    body.light-mode .card,
+    body.light-mode .info-card,
+    body.light-mode .question-box,
+    body.light-mode .result-box,
+    body.light-mode .history-box,
+    body.light-mode .stat {
+      background: rgba(255, 255, 255, 0.62);
+      border-color: rgba(148, 163, 184, 0.2);
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+    }
+
+    @media (max-width: 980px) {
+      .container { grid-template-columns: 1fr; }
+      .hero { padding: 30px; }
+      .quiz-card, .side-panel { padding: 24px; }
+      .button-group { grid-template-columns: repeat(2, 1fr); }
+      .utility-row { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 560px) {
+      body { padding: 16px; }
+      .button-group, .stats { grid-template-columns: 1fr; }
+      .hero, .quiz-card, .side-panel { padding: 20px; }
+      .question-box, .info-card, .result-box, .history-box { padding: 18px; }
+      .progress-bar { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <section class="card hero">
+      <div class="hero-glow"></div>
+      <span class="badge">⚡ WEB GUI FUZZING DEMO</span>
+      <h1>조금 더 간지나는 버그 탐지용 O/X 웹 애플리케이션</h1>
+      <p>
+        단순한 테스트 페이지가 아니라, 실제 서비스처럼 보이는 인터페이스로 바꿨습니다.
+        퀴즈 진행, 진행률 표시, 기록 패널, 리셋 기능까지 추가해서 웹 탐색 과정에서 더 다양한 상태를 만들 수 있게 했어요.
+      </p>
+    </section>
+
+    <aside class="card side-panel">
+      <div class="info-card">
+        <h3>퀴즈 정보</h3>
+        <p>현재 문제 수는 <strong id="questionCountText">3개</strong>이고, 정답은 문제마다 다르게 설정되어 있습니다.</p>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <span class="stat-label">총 시도</span>
+          <strong id="totalCount">0</strong>
+        </div>
+        <div class="stat">
+          <span class="stat-label">정답 수</span>
+          <strong id="correctCount">0</strong>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <h3>컨트롤 패널</h3>
+        <p id="modeLabel">다크 모드</p>
+        <p>랜덤 이동, 테마 변경, 문제 넘기기 같은 탐색 동작을 넣어 퍼징 시나리오를 더 다양하게 만들 수 있습니다.</p>
+      </div>
+
+      <div class="info-card">
+        <h3>기능 포인트</h3>
+        <ul>
+          <li>진행률 바</li>
+          <li>이전 선택 기록</li>
+          <li>리셋 버튼</li>
+          <li>랜덤 문제 이동</li>
+          <li>의도적 런타임 버그 포함</li>
+        </ul>
+      </div>
+
+      <p class="footer-note">Frontend Demo • O/X Quiz UI</p>
+    </aside>
+
+    <section class="card quiz-card">
+      <div class="quiz-top">
+        <div class="quiz-meta">
+          <span class="quiz-label" id="questionIndexLabel">문제 1</span>
+          <span class="chip" id="scoreChip">정답률 0%</span>
+          <span class="chip warn" id="stateChip">대기 중</span>
+        </div>
+
+        <div class="progress-wrap">
+          <span class="quiz-label">진행률</span>
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="question-box">
+        <p class="question-title">QUESTION</p>
+        <p class="question-text">HTML은 웹페이지의 기본 구조를 만드는 언어이다.</p>
+      </div>
+
+      <div class="button-group">
+        <button class="btn-o" onclick="answerO()">O</button>
+        <button class="btn-x" onclick="answerX()">X</button>
+        <button class="btn-next" onclick="goNext()">다음 문제</button>
+        <button class="btn-theme" onclick="toggleTheme()">테마 변경</button>
+        <button class="btn-next" onclick="resetQuiz()">리셋</button>
+        <button class="btn-theme" onclick="jumpRandom()">랜덤 이동</button>
+      </div>
+
+      <div class="utility-row">
+        <div class="result-box" id="resultBox">
+          <span class="result-status">결과 안내</span>
+          <p class="result-message" id="resultMessage">아직 답을 선택하지 않았습니다.</p>
+          <p class="result-detail" id="resultDetail">버튼을 눌러 정답 여부를 확인하세요.</p>
+        </div>
+
+        <div class="history-box">
+          <span class="history-title">탐색 기록</span>
+          <ol class="history-list" id="historyList">
+            <li>페이지가 초기화되었습니다.</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let total = 0;
+    let correct = 0;
+    let currentQuestion = 0;
+
+    const questions = [
+      { text: "HTML은 웹페이지의 기본 구조를 만드는 언어이다.", answer: "O" },
+      { text: "CSS는 데이터베이스를 관리하는 언어이다.", answer: "X" },
+      { text: "JavaScript는 브라우저에서 동작할 수 있다.", answer: "O" }
+    ];
+
+    const totalCount = document.getElementById("totalCount");
+    const correctCount = document.getElementById("correctCount");
+    const resultBox = document.getElementById("resultBox");
+    const resultMessage = document.getElementById("resultMessage");
+    const resultDetail = document.getElementById("resultDetail");
+    const questionText = document.querySelector(".question-text");
+    const questionIndexLabel = document.getElementById("questionIndexLabel");
+    const progressFill = document.getElementById("progressFill");
+    const scoreChip = document.getElementById("scoreChip");
+    const stateChip = document.getElementById("stateChip");
+    const historyList = document.getElementById("historyList");
+    const questionCountText = document.getElementById("questionCountText");
+
+    questionCountText.innerText = `${questions.length}개`;
+
+    function addHistory(text) {
+      const li = document.createElement("li");
+      li.innerText = text;
+      historyList.prepend(li);
+
+      if (historyList.children.length > 8) {
+        historyList.removeChild(historyList.lastElementChild);
+      }
+    }
+
+    function updateStats() {
+      totalCount.innerText = total;
+      correctCount.innerText = correct;
+
+      const ratio = total === 0 ? 0 : Math.round((correct / total) * 100);
+      scoreChip.innerText = `정답률 ${ratio}%`;
+    }
+
+    function updateProgress() {
+      const percent = ((currentQuestion + 1) / questions.length) * 100;
+      progressFill.style.width = percent + "%";
+    }
+
+    function renderQuestion() {
+      questionText.innerText = questions[currentQuestion].text;
+      questionIndexLabel.innerText = `문제 ${currentQuestion + 1}`;
+      updateProgress();
+    }
+
+    function showCorrect() {
+      resultMessage.innerText = "정답입니다 🎉";
+      resultMessage.className = "result-message correct";
+      resultDetail.innerText = "좋아요! 정답을 맞혔습니다.";
+      stateChip.innerText = "정답 선택";
+    }
+
+    function showWrong() {
+      resultMessage.innerText = "오답입니다";
+      resultMessage.className = "result-message wrong";
+      resultDetail.innerText = "정답이 아닙니다.";
+      stateChip.innerText = "오답 선택";
+    }
+
+    function answerO() {
+      total++;
+      addHistory(`문제 ${currentQuestion + 1} → O 선택`);
+
+      if (questions[currentQuestion].answer === "O") {
+        correct++;
+        showCorrect();
+      } else {
+        showWrong();
+      }
+
+      updateStats();
+
+      /* ------------------------------
+         의도적 버그 #1
+         특정 문제에서 없는 함수 호출
+         Runtime: ReferenceError
+      ------------------------------ */
+      if (currentQuestion === 1) {
+        setTimeout(() => {
+          updateScoreBoard();
+        }, 200);
+      }
+    }
+
+    function answerX() {
+      total++;
+      addHistory(`문제 ${currentQuestion + 1} → X 선택`);
+
+      if (questions[currentQuestion].answer === "X") {
+        correct++;
+        showCorrect();
+      } else {
+        showWrong();
+      }
+
+      updateStats();
+
+      /* ------------------------------
+         의도적 버그 #2
+         존재하지 않는 DOM 접근
+         Runtime: TypeError
+      ------------------------------ */
+      if (currentQuestion === 2) {
+        setTimeout(() => {
+          document.getElementById("historyPanel").innerText = "update";
+        }, 150);
+      }
+    }
+
+    function goNext() {
+      currentQuestion++;
+
+      addHistory("다음 문제 이동");
+
+      /* ------------------------------
+         의도적 버그 #3
+         배열 범위 체크 없음
+         Out-of-bounds → undefined 접근
+      ------------------------------ */
+
+      renderQuestion();
+
+      resultMessage.innerText = "다음 문제로 이동했습니다.";
+      resultDetail.innerText = "새 문제에 답해보세요.";
+      stateChip.innerText = "문제 이동";
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle("light-mode");
+
+      const modeLabel = document.getElementById("modeLabel");
+      modeLabel.innerText = document.body.classList.contains("light-mode")
+        ? "라이트 모드"
+        : "다크 모드";
+
+      addHistory("테마 변경");
+      stateChip.innerText = "테마 변경";
+    }
+
+    function resetQuiz() {
+      total = 0;
+      correct = 0;
+      currentQuestion = 0;
+
+      renderQuestion();
+      updateStats();
+
+      addHistory("퀴즈 리셋");
+
+      resultMessage.innerText = "퀴즈 초기화";
+      resultDetail.innerText = "다시 시작하세요.";
+      stateChip.innerText = "초기화";
+    }
+
+    function jumpRandom() {
+      currentQuestion = Math.floor(Math.random() * questions.length);
+
+      renderQuestion();
+
+      addHistory(`랜덤 이동 → ${currentQuestion + 1}`);
+      stateChip.innerText = "랜덤 이동";
+
+      /* ------------------------------
+         의도적 버그 #4 (간헐적)
+         JSON 파싱 오류
+         Runtime: SyntaxError
+      ------------------------------ */
+
+      if (Math.random() > 0.75) {
+        JSON.parse("{bad-json}");
+      }
+    }
+
+    /* ------------------------------
+       의도적 버그 #5 (지연 발생)
+       null property 접근
+       Runtime: TypeError
+    ------------------------------ */
+
+    setTimeout(() => {
+      if (Math.random() > 0.8) {
+        let user = null;
+        console.log(user.profile.name);
+      }
+    }, 4000);
+
+    renderQuestion();
+    updateStats();
+
+  </script>
+</body>
+</html>
