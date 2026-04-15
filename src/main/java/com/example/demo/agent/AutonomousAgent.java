@@ -1,3 +1,5 @@
+package com.example.demo.agent;
+
 import com.microsoft.playwright.*;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -18,6 +20,8 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class AutonomousAgent {
+
+    private static final String BACKEND_BASE_URL = "http://localhost:8081";
 
     private static final String PYTHON_MODEL_URL = "http://localhost:8000/predict";
     private static final String PYTHON_REPORT_URL = "http://localhost:8001/report";
@@ -57,9 +61,21 @@ public class AutonomousAgent {
     }
 
     public static void main(String[] args) {
-        String targetUrl = "http://localhost:8080/";
+        String targetUrl = args.length > 0 ? args[0] : "http://localhost:8080/";
+        String sessionId = args.length > 1 ? args[1] : "test-session";
+
         System.out.println("[Agent] Playwright + RL Bridge 시작: " + targetUrl);
         System.out.println("[DEBUG] report timeout = 120 seconds\n");
+
+        sendEventToBackend(
+                sessionId,
+                "status",
+                "Status",
+                "테스트 시작",
+                0,
+                "running",
+                null
+        );
 
         List<String> actionHistory = new ArrayList<>();
         AtomicInteger errorCount = new AtomicInteger(0);
@@ -78,6 +94,16 @@ public class AutonomousAgent {
                 System.out.println("  -> " + errorLog);
                 actionHistory.add(errorLog);
                 errorCount.incrementAndGet();
+
+                sendEventToBackend(
+                        sessionId,
+                        "issue",
+                        "Error",
+                        errorLog,
+                        null,
+                        null,
+                        "error"
+                );
             });
 
             page.onConsoleMessage(msg -> {
@@ -86,6 +112,16 @@ public class AutonomousAgent {
                     System.out.println("  -> " + errorLog);
                     actionHistory.add(errorLog);
                     errorCount.incrementAndGet();
+
+                    sendEventToBackend(
+                            sessionId,
+                            "issue",
+                            "Error",
+                            errorLog,
+                            null,
+                            null,
+                            "error"
+                    );
                 }
             });
 
@@ -94,6 +130,16 @@ public class AutonomousAgent {
                 System.out.println("  -> " + failLog);
                 actionHistory.add(failLog);
                 errorCount.incrementAndGet();
+
+                sendEventToBackend(
+                        sessionId,
+                        "issue",
+                        "Network",
+                        failLog,
+                        null,
+                        null,
+                        "warning"
+                );
             });
 
             try {
@@ -125,6 +171,16 @@ public class AutonomousAgent {
                     if (actionJson == null) {
                         System.out.println("[시스템] 모델 서버 통신 오류로 탐색을 종료합니다.");
                         actionHistory.add("[System] 모델 서버 통신 오류로 탐색 종료");
+
+                        sendEventToBackend(
+                                sessionId,
+                                "issue",
+                                "Error",
+                                "[System] 모델 서버 통신 오류로 탐색 종료",
+                                null,
+                                null,
+                                "error"
+                        );
                         break;
                     }
 
@@ -135,6 +191,16 @@ public class AutonomousAgent {
                         String parseFail = "[시스템] 모델 응답 파싱 실패: " + ex.getMessage();
                         System.out.println(parseFail);
                         actionHistory.add(parseFail);
+
+                        sendEventToBackend(
+                                sessionId,
+                                "issue",
+                                "Error",
+                                parseFail,
+                                null,
+                                null,
+                                "error"
+                        );
                         break;
                     }
 
@@ -158,6 +224,17 @@ public class AutonomousAgent {
                         System.out.println(warn);
                         actionHistory.add(warn);
                         previousActionSuccess = false;
+
+                        sendEventToBackend(
+                                sessionId,
+                                "issue",
+                                "Error",
+                                warn,
+                                Math.min(step * 5, 100),
+                                null,
+                                "warning"
+                        );
+
                         page.waitForTimeout(1000);
                         continue;
                     }
@@ -168,19 +245,63 @@ public class AutonomousAgent {
                     actionHistory.add(actionLog);
                     lastActionName = actionLog;
 
+                    int progress = Math.min(step * 5, 100);
+
+                    sendEventToBackend(
+                            sessionId,
+                            "log",
+                            "Action",
+                            actionLog,
+                            progress,
+                            null,
+                            null
+                    );
+
+                    sendEventToBackend(
+                            sessionId,
+                            "progress",
+                            "Progress",
+                            "탐색 진행 중",
+                            progress,
+                            "running",
+                            null
+                    );
+
                     try {
                         chosen.locator.scrollIntoViewIfNeeded();
                         chosen.locator.click(new Locator.ClickOptions().setTimeout(3000));
                         page.waitForTimeout(1200);
 
                         previousActionSuccess = true;
-                        actionHistory.add("[State] " + captureStateSignature(page));
+                        String stateLog = "[State] " + captureStateSignature(page);
+                        actionHistory.add(stateLog);
+
+                        sendEventToBackend(
+                                sessionId,
+                                "log",
+                                "State",
+                                captureStateSignature(page),
+                                progress,
+                                null,
+                                null
+                        );
+
                     } catch (Exception e) {
                         String failLog = "[클릭 실패] " + chosen.summary() + " / " + e.getMessage();
                         System.out.println(failLog);
                         actionHistory.add(failLog);
                         previousActionSuccess = false;
                         errorCount.incrementAndGet();
+
+                        sendEventToBackend(
+                                sessionId,
+                                "issue",
+                                "Error",
+                                failLog,
+                                progress,
+                                null,
+                                "error"
+                        );
                     }
                 }
 
@@ -191,6 +312,16 @@ public class AutonomousAgent {
                 String delayedLog = "[Delayed Error Check] 추가 대기 중 감지된 오류 수: " + delayedErrors;
                 System.out.println(delayedLog);
                 actionHistory.add(delayedLog);
+
+                sendEventToBackend(
+                        sessionId,
+                        "log",
+                        "State",
+                        delayedLog,
+                        100,
+                        null,
+                        null
+                );
 
                 System.out.println("\n[시스템] 탐색 루프 종료. 수집된 로그를 기반으로 LLM 레포트를 생성합니다...");
                 String llmReport = generateReportWithLLM(actionHistory);
@@ -203,16 +334,94 @@ public class AutonomousAgent {
 
                 saveReportAsPdf(browser, llmReport);
 
+                sendEventToBackend(
+                        sessionId,
+                        "status",
+                        "Status",
+                        "테스트 완료",
+                        100,
+                        "completed",
+                        null
+                );
+
+                completeSession(sessionId);
+
             } catch (Exception e) {
                 String fatal = "[오류] 탐색 중 예외 발생: " + e.getMessage();
                 System.out.println(fatal);
                 actionHistory.add(fatal);
+
+                sendEventToBackend(
+                        sessionId,
+                        "issue",
+                        "Error",
+                        fatal,
+                        null,
+                        "failed",
+                        "error"
+                );
             } finally {
                 context.close();
             }
 
         } catch (Exception e) {
             System.out.println("[오류] Playwright 실행 실패: " + e.getMessage());
+
+            sendEventToBackend(
+                    sessionId,
+                    "issue",
+                    "Error",
+                    "[오류] Playwright 실행 실패: " + e.getMessage(),
+                    null,
+                    "failed",
+                    "error"
+            );
+        }
+    }
+
+    private static void sendEventToBackend(
+            String sessionId,
+            String type,
+            String label,
+            String message,
+            Integer progress,
+            String status,
+            String issueType
+    ) {
+        try {
+            JsonObject json = new JsonObject();
+            json.addProperty("type", type);
+            json.addProperty("label", label);
+            json.addProperty("message", message);
+
+            if (progress != null) json.addProperty("progress", progress);
+            if (status != null) json.addProperty("status", status);
+            if (issueType != null) json.addProperty("issueType", issueType);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(BACKEND_BASE_URL + "/api/internal/test/" + sessionId + "/event"))
+                    .timeout(Duration.ofSeconds(5))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(json.toString()))
+                    .build();
+
+            httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (Exception e) {
+            System.out.println("[백엔드 이벤트 전송 실패] " + e.getMessage());
+        }
+    }
+
+    private static void completeSession(String sessionId) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(BACKEND_BASE_URL + "/api/internal/test/" + sessionId + "/complete"))
+                    .timeout(Duration.ofSeconds(5))
+                    .POST(HttpRequest.BodyPublishers.noBody())
+                    .build();
+
+            httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (Exception e) {
+            System.out.println("[세션 완료 전송 실패] " + e.getMessage());
         }
     }
 
@@ -343,7 +552,6 @@ public class AutonomousAgent {
             JsonObject json = new JsonObject();
             JsonArray logArray = new JsonArray();
 
-            // 너무 많은 로그는 잘라서 보냄
             int start = Math.max(0, logs.size() - 100);
             for (int i = start; i < logs.size(); i++) {
                 logArray.add(logs.get(i));
