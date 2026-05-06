@@ -7,7 +7,6 @@ import jakarta.validation.constraints.Size;
 
 public class AuthDto {
 
-    // 회원가입 요청 - POST /api/auth/signup
     public record SignupRequest(
             @NotBlank(message = "이름은 필수입니다.")
             @Size(min = 2, max = 50, message = "이름은 2~50자여야 합니다.")
@@ -22,17 +21,14 @@ public class AuthDto {
             String password
     ) {}
 
-    // 로그인 요청 - POST /api/auth/login
     public record LoginRequest(
-            @NotBlank(message = "이메일은 필수입니다.")
-            @Email(message = "이메일 형식이 올바르지 않습니다.")
+            @NotBlank(message = "이메일 또는 사용자명을 입력해주세요.")
             String email,
 
-            @NotBlank(message = "비밀번호는 필수입니다.")
+            @NotBlank(message = "비밀번호를 입력해주세요.")
             String password
     ) {}
 
-    // 인증 성공 응답
     public record AuthResponse(
             String accessToken,
             String refreshToken,
@@ -53,6 +49,5 @@ public class AuthDto {
         }
     }
 
-    // 에러 응답
     public record ErrorResponse(int status, String message) {}
 }

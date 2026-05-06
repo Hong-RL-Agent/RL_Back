@@ -1,15 +1,16 @@
 package com.jaws.jawsback.service;
 
-import com.jaws.jawsback.dto.AuthDto.*;
+import com.jaws.jawsback.dto.AuthDto.AuthResponse;
+import com.jaws.jawsback.dto.AuthDto.LoginRequest;
+import com.jaws.jawsback.dto.AuthDto.SignupRequest;
 import com.jaws.jawsback.entity.User;
+import com.jaws.jawsback.exception.DuplicateEmailException;
 import com.jaws.jawsback.repository.UserRepository;
 import com.jaws.jawsback.security.JwtProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.jaws.jawsback.exception.DuplicateEmailException;
-
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +40,7 @@ public class AuthService {
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.email())
+                .or(() -> userRepository.findByUserName(request.email()))
                 .orElseThrow(() -> new IllegalArgumentException("이메일 또는 비밀번호가 올바르지 않습니다."));
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
@@ -49,7 +51,7 @@ public class AuthService {
     }
 
     private AuthResponse issueTokens(User user) {
-        String accessToken  = jwtProvider.generateAccessToken(user.getEmail(), user.getRole().name());
+        String accessToken = jwtProvider.generateAccessToken(user.getEmail(), user.getRole().name());
         String refreshToken = jwtProvider.generateRefreshToken(user.getEmail());
         return AuthResponse.of(accessToken, refreshToken, user);
     }

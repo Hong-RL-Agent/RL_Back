@@ -1,23 +1,23 @@
 openapi: 3.0.3
 info:
   title: JAWS API Document
-  description: JAWS 인증 및 테스트 API 명세서입니다.
+  description: JAWS authentication and test-session API.
   version: 1.0.0
 servers:
   - url: http://localhost:8080
-    description: 로컬 개발 서버
+    description: Local backend, Vite proxy target
+  - url: http://localhost:8081
+    description: Local backend, frontend direct test/SSE target
 tags:
   - name: Auth
-    description: 사용자 인증 관련 API
+    description: Authentication API
   - name: Test
-    description: 테스트 세션 관련 API
+    description: Test session API
 paths:
   /api/auth/signup:
     post:
-      tags:
-        - Auth
-      summary: 회원가입
-      description: 새로운 사용자 계정을 생성합니다.
+      tags: [Auth]
+      summary: Sign up
       requestBody:
         required: true
         content:
@@ -26,36 +26,27 @@ paths:
               $ref: '#/components/schemas/SignupRequest'
       responses:
         '201':
-          description: 회원가입 성공
+          description: Created
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthResponse'
         '400':
-          description: 유효성 검사 실패
+          description: Validation error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              example:
-                status: 400
-                message: 이름은 2~50자여야 합니다.
         '409':
-          description: 중복된 이메일
+          description: Duplicate email
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              example:
-                status: 409
-                message: 이미 사용 중인 이메일입니다.
-
   /api/auth/login:
     post:
-      tags:
-        - Auth
-      summary: 로그인
-      description: 이메일과 비밀번호로 로그인하고 토큰을 발급받습니다.
+      tags: [Auth]
+      summary: Log in
       requestBody:
         required: true
         content:
@@ -64,38 +55,21 @@ paths:
               $ref: '#/components/schemas/LoginRequest'
       responses:
         '200':
-          description: 로그인 성공 및 토큰 발급
+          description: OK
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthResponse'
-        '401':
-          description: 계정 정보 불일치
+        '400':
+          description: Invalid credentials
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              example:
-                status: 401
-                message: 이메일 또는 비밀번호가 올바르지 않습니다.
-        '404':
-          description: 존재하지 않는 사용자
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                status: 404
-                message: 이메일 또는 비밀번호가 올바르지 않습니다.
-
   /api/test/start:
     post:
-      tags:
-        - Test
-      summary: 테스트 세션 생성
-      description: URL을 입력받아 테스트 세션을 생성하고 sessionId를 반환합니다.
-      security:
-        - BearerAuth: []
+      tags: [Test]
+      summary: Start a test session
       requestBody:
         required: true
         content:
@@ -104,215 +78,216 @@ paths:
               $ref: '#/components/schemas/TestStartRequest'
       responses:
         '201':
-          description: 테스트 세션 생성 성공
+          description: Created
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/TestStartResponse'
         '400':
-          description: 유효성 검사 실패
+          description: Validation error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              example:
-                status: 400
-                message: URL은 필수입니다.
-        '401':
-          description: 인증 실패
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                status: 401
-                message: 인증이 필요합니다.
-
-  /api/test/{sessionId}/progress:
+  /api/test/{sessionId}/stream:
     get:
-      tags:
-        - Test
-      summary: 테스트 진행률 조회
-      security:
-        - BearerAuth: []
+      tags: [Test]
+      summary: Subscribe to live session events with SSE
       parameters:
-        - name: sessionId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/SessionId'
       responses:
         '200':
-          description: 진행률 조회 성공
+          description: Server-sent event stream
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/StreamEvent'
+        '404':
+          description: Session not found
+  /api/test/{sessionId}/progress:
+    get:
+      tags: [Test]
+      summary: Get session progress
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: OK
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/TestProgressResponse'
-        '404':
-          description: 세션 없음
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                status: 404
-                message: 존재하지 않는 세션입니다.
-
   /api/test/{sessionId}/logs:
     get:
-      tags:
-        - Test
-      summary: 실시간 로그 조회
-      security:
-        - BearerAuth: []
+      tags: [Test]
+      summary: Get action logs
       parameters:
-        - name: sessionId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/SessionId'
       responses:
         '200':
-          description: 로그 조회 성공
+          description: OK
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/TestLogsResponse'
-        '404':
-          description: 세션 없음
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                status: 404
-                message: 존재하지 않는 세션입니다.
-
   /api/test/{sessionId}/issues:
     get:
-      tags:
-        - Test
-      summary: 탐지 이슈 조회
-      security:
-        - BearerAuth: []
+      tags: [Test]
+      summary: Get detected issues
       parameters:
-        - name: sessionId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/SessionId'
       responses:
         '200':
-          description: 이슈 조회 성공
+          description: OK
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/TestIssuesResponse'
-        '404':
-          description: 세션 없음
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                status: 404
-                message: 존재하지 않는 세션입니다.
-
   /api/test/{sessionId}/report:
     post:
-      tags:
-        - Test
-      summary: 리포트 생성 요청
-      security:
-        - BearerAuth: []
+      tags: [Test]
+      summary: Create or get a report record
       parameters:
-        - name: sessionId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/SessionId'
       responses:
         '201':
-          description: 리포트 생성 성공
+          description: Created
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/TestReportResponse'
-        '404':
-          description: 세션 없음
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                status: 404
-                message: 존재하지 않는 세션입니다.
-
 components:
-  securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
+  parameters:
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: 550e8400-e29b-41d4-a716-446655440000
   schemas:
     SignupRequest:
       type: object
-      required:
-        - userName
-        - email
-        - password
+      required: [userName, email, password]
       properties:
         userName:
           type: string
-          example: 홍길동
-          description: 사용자 이름 (2~50자)
+          example: tester
         email:
           type: string
           format: email
-          example: user123@example.com
+          example: user@example.com
         password:
           type: string
           format: password
           example: Password123!
-          description: 비밀번호 (최소 6자)
-
     LoginRequest:
       type: object
-      required:
-        - email
-        - password
+      required: [email, password]
       properties:
         email:
           type: string
           format: email
-          example: user123@example.com
+          example: user@example.com
         password:
           type: string
           format: password
           example: Password123!
-
     AuthResponse:
       type: object
       properties:
         accessToken:
           type: string
-          example: eyJhbGciOiJIUzI1NiIsInR5...
         refreshToken:
           type: string
-          example: dGhpcy1pcy1yZWZyZXNoLXRva2Vu...
         tokenType:
           type: string
           example: Bearer
         userId:
           type: integer
-          example: 1
+          format: int64
         userName:
           type: string
-          example: 홍길동
         role:
           type: string
           example: USER
-
+    TestStartRequest:
+      type: object
+      required: [targetUrl]
+      properties:
+        targetUrl:
+          type: string
+          example: https://example.com
+        agentConfig:
+          type: object
+          additionalProperties: true
+          example: {}
+    TestStartResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        status:
+          type: string
+          example: READY
+    TestProgressResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        status:
+          type: string
+          example: RUNNING
+        progress:
+          type: integer
+          example: 60
+    TestLogsResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        logs:
+          type: array
+          items:
+            type: string
+    TestIssuesResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        issues:
+          type: array
+          items:
+            type: string
+    TestReportResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        reportUrl:
+          type: string
+          example: /reports/550e8400-e29b-41d4-a716-446655440000.pdf
+    StreamEvent:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [progress, log, issue, status, complete]
+        label:
+          type: string
+          example: Network
+        message:
+          type: string
+          example: Network response timing checked
+        progress:
+          type: integer
+          example: 80
+        status:
+          type: string
+          enum: [running, paused, completed, failed]
+        issueType:
+          type: string
+          enum: [error, warning]
     ErrorResponse:
       type: object
       properties:
@@ -321,74 +296,4 @@ components:
           example: 400
         message:
           type: string
-          example: 이메일은 필수입니다.
-
-    TestStartRequest:
-      type: object
-      required:
-        - targetUrl
-      properties:
-        targetUrl:
-          type: string
-          example: https://example.com
-        agentConfig:
-          type: object
-          description: 테스트 옵션 (선택)
-          example: {}
-
-    TestStartResponse:
-      type: object
-      properties:
-        sessionId:
-          type: string
-          example: abc123-uuid
-        status:
-          type: string
-          example: READY
-
-    TestProgressResponse:
-      type: object
-      properties:
-        sessionId:
-          type: string
-          example: abc123-uuid
-        status:
-          type: string
-          example: RUNNING
-        progress:
-          type: integer
-          example: 45
-
-    TestLogsResponse:
-      type: object
-      properties:
-        sessionId:
-          type: string
-          example: abc123-uuid
-        logs:
-          type: array
-          items:
-            type: string
-          example: ["페이지 로드 완료", "버튼 클릭 감지"]
-
-    TestIssuesResponse:
-      type: object
-      properties:
-        sessionId:
-          type: string
-          example: abc123-uuid
-        issues:
-          type: array
-          items:
-            type: string
-          example: ["콘솔 에러 발생", "렌더링 오류 감지"]
-
-    TestReportResponse:
-      type: object
-      properties:
-        sessionId:
-          type: string
-          example: abc123-uuid
-        reportUrl:
-          type: string
-          example: /reports/abc123-uuid.pdf
+          example: URL is required.
