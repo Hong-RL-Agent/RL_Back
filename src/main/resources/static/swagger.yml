@@ -4,10 +4,8 @@ info:
   description: JAWS authentication and test-session API.
   version: 1.0.0
 servers:
-  - url: http://localhost:8080
+  - url: http://localhost:8000
     description: Local backend, Vite proxy target
-  - url: http://localhost:8081
-    description: Local backend, frontend direct test/SSE target
 tags:
   - name: Auth
     description: Authentication API

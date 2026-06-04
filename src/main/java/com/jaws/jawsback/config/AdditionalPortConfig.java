@@ -10,15 +10,17 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class AdditionalPortConfig {
 
-    @Value("${server.additional-port}")
+    @Value("${server.additional-port:0}")
     private int additionalPort;
 
     @Bean
     public ServletWebServerFactory servletContainer() {
         TomcatServletWebServerFactory tomcat = new TomcatServletWebServerFactory();
-        Connector connector = new Connector(TomcatServletWebServerFactory.DEFAULT_PROTOCOL);
-        connector.setPort(additionalPort);
-        tomcat.addAdditionalTomcatConnectors(connector);
+        if (additionalPort > 0) {
+            Connector connector = new Connector(TomcatServletWebServerFactory.DEFAULT_PROTOCOL);
+            connector.setPort(additionalPort);
+            tomcat.addAdditionalTomcatConnectors(connector);
+        }
         return tomcat;
     }
 }

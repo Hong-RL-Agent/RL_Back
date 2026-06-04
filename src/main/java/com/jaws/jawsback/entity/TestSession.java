@@ -75,6 +75,12 @@ public class TestSession {
 
     public void markRunning() {
         this.status = SessionStatus.RUNNING;
+        this.endedAt = null;
+    }
+
+    public void markStopped() {
+        this.status = SessionStatus.STOPPED;
+        this.endedAt = LocalDateTime.now();
     }
 
     public void markCompleted() {

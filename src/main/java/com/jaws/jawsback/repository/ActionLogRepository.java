@@ -8,4 +8,6 @@ import java.util.List;
 public interface ActionLogRepository extends JpaRepository<ActionLog, Long> {
 
     List<ActionLog> findBySessionSessionUuidOrderByCreatedAtAsc(String sessionUuid);
+
+    List<ActionLog> findTop20ByOrderByCreatedAtDesc();
 }

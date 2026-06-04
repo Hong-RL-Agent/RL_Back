@@ -85,6 +85,7 @@ public class TestSessionService {
     private final TransactionTemplate transactionTemplate;
     private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
     private final Map<String, Integer> progressStore = new ConcurrentHashMap<>();
+    private final Map<String, Future<?>> runningTasks = new ConcurrentHashMap<>();
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(3))
@@ -96,7 +97,7 @@ public class TestSessionService {
     @Value("${external.playwright.max-steps:8}")
     private int playwrightMaxSteps;
 
-    @Value("${external.ai.model-url:http://localhost:8000/predict}")
+    @Value("${external.ai.model-url:http://localhost:8080/predict}")
     private String aiModelUrl;
 
     @Value("${external.ai.report-url:http://localhost:8001/report}")
@@ -210,6 +211,33 @@ public class TestSessionService {
         return new TestReportResponse(sessionId, report.getFilePath());
     }
 
+    @Transactional
+    public TestSession stop(String sessionId) {
+        TestSession session = findSession(sessionId);
+        Future<?> task = runningTasks.remove(sessionId);
+        if (task != null) {
+            task.cancel(true);
+        }
+        session.markStopped();
+        progressStore.put(sessionId, 0);
+        send(sessionId, "status", StreamEvent.status("paused"));
+        completeEmitter(sessionId);
+        return session;
+    }
+
+    @Transactional
+    public TestSession restart(String sessionId) {
+        TestSession session = findSession(sessionId);
+        Future<?> task = runningTasks.remove(sessionId);
+        if (task != null) {
+            task.cancel(true);
+        }
+        session.markRunning();
+        progressStore.put(sessionId, 0);
+        runTest(sessionId, session.getTargetUrl());
+        return session;
+    }
+
     private User resolveCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.isAuthenticated() && authentication.getPrincipal() instanceof String email) {
@@ -237,19 +265,27 @@ public class TestSessionService {
     }
 
     private void runTest(String sessionId, String targetUrl) {
-        executor.submit(() -> {
-            if (runPlaywrightTest(sessionId, targetUrl)) {
-                return;
+        Future<?> task = executor.submit(() -> {
+            try {
+                if (runPlaywrightTest(sessionId, targetUrl)) {
+                    return;
+                }
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
+                markFailed(sessionId);
+                progressStore.put(sessionId, 0);
+                saveBug(sessionId, null, "TEST_TARGET_UNAVAILABLE", ErrorScopeType.NETWORK, 4,
+                        "The target server could not be tested. Check that the target URL is running and reachable.");
+                send(sessionId, "issue", StreamEvent.issue("Network",
+                        "The target server could not be tested. Check that the target URL is running and reachable.", "error"));
+                send(sessionId, "status", StreamEvent.status("failed"));
+                completeEmitter(sessionId);
+            } finally {
+                runningTasks.remove(sessionId);
             }
-            markFailed(sessionId);
-            progressStore.put(sessionId, 0);
-            saveBug(sessionId, null, "TEST_TARGET_UNAVAILABLE", ErrorScopeType.NETWORK, 4,
-                    "The target server could not be tested. Check that the target URL is running and reachable.");
-            send(sessionId, "issue", StreamEvent.issue("Network",
-                    "The target server could not be tested. Check that the target URL is running and reachable.", "error"));
-            send(sessionId, "status", StreamEvent.status("failed"));
-            completeEmitter(sessionId);
         });
+        runningTasks.put(sessionId, task);
     }
 
     private boolean runPlaywrightTest(String sessionId, String targetUrl) {
@@ -382,6 +418,7 @@ public class TestSessionService {
     }
 
     private boolean runPlaywrightChildProcess(String sessionId, String targetUrl) {
+        Process process = null;
         try {
             saveAction(sessionId, "Playwright", null, "Running Playwright in an isolated backend child process.");
             send(sessionId, "log", StreamEvent.log("State", "Running Playwright in an isolated backend child process."));
@@ -397,9 +434,10 @@ public class TestSessionService {
             );
             processBuilder.redirectErrorStream(true);
 
-            Process process = processBuilder.start();
+            process = processBuilder.start();
+            Process runningProcess = process;
             CompletableFuture<List<String>> outputFuture = CompletableFuture.supplyAsync(() -> {
-                try (var reader = process.inputReader(StandardCharsets.UTF_8)) {
+                try (var reader = runningProcess.inputReader(StandardCharsets.UTF_8)) {
                     return reader.lines().toList();
                 } catch (IOException e) {
                     return List.of("Unable to read Playwright output: " + e.getMessage());
@@ -456,6 +494,12 @@ public class TestSessionService {
             send(sessionId, "complete", StreamEvent.complete());
             completeEmitter(sessionId);
             return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            if (process != null) {
+                process.destroyForcibly();
+            }
+            return false;
         } catch (Exception e) {
             saveAction(sessionId, "Error", null, "Playwright child process failed: " + e.getMessage());
             send(sessionId, "log", StreamEvent.log("Error", "Playwright child process failed: " + e.getMessage()));
