@@ -1,0 +1,73 @@
+﻿runId,capturedAt,tick,fromStateId,fromPageType,fromUrl,candidateRank,candidateCount,actionId,actionType,actionLabel,actionSelector,actionIndex,actionScore,selected
+"20260619-164527","2026-06-19T16:45:30.016593300",1,"63da0ad8-2601-46b9-bb10-92d0f59a07c4","general","http://localhost:3000/",1,9,"click_button_0_o","click","O","button",0,10.0,false
+"20260619-164527","2026-06-19T16:45:30.016593300",1,"63da0ad8-2601-46b9-bb10-92d0f59a07c4","general","http://localhost:3000/",2,9,"click_button_1_x","click","X","button",1,10.0,false
+"20260619-164527","2026-06-19T16:45:30.016593300",1,"63da0ad8-2601-46b9-bb10-92d0f59a07c4","general","http://localhost:3000/",3,9,"click_button_2_다음_문제","click","다음 문제","button",2,15.0,true
+"20260619-164527","2026-06-19T16:45:30.016593300",1,"63da0ad8-2601-46b9-bb10-92d0f59a07c4","general","http://localhost:3000/",4,9,"click_button_3_테마_변경","click","테마 변경","button",3,10.0,false
+"20260619-164527","2026-06-19T16:45:30.016593300",1,"63da0ad8-2601-46b9-bb10-92d0f59a07c4","general","http://localhost:3000/",5,9,"click_button_4_리셋","click","리셋","button",4,10.0,false
+"20260619-164527","2026-06-19T16:45:30.016593300",1,"63da0ad8-2601-46b9-bb10-92d0f59a07c4","general","http://localhost:3000/",6,9,"click_button_5_랜덤_이동","click","랜덤 이동","button",5,10.0,false
+"20260619-164527","2026-06-19T16:45:30.016593300",1,"63da0ad8-2601-46b9-bb10-92d0f59a07c4","general","http://localhost:3000/",7,9,"viewport_mobile_390x844","viewport","모바일 뷰포트 390x844","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:30.016593300",1,"63da0ad8-2601-46b9-bb10-92d0f59a07c4","general","http://localhost:3000/",8,9,"viewport_tablet_768x900","viewport","태블릿 뷰포트 768x900","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:30.016593300",1,"63da0ad8-2601-46b9-bb10-92d0f59a07c4","general","http://localhost:3000/",9,9,"viewport_desktop_1366x900","viewport","데스크톱 뷰포트 1366x900","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:31.692562200",2,"2f77c916-43c2-4c68-aad9-c4f2c69acf37","general","http://localhost:3000/",1,9,"click_button_0_o","click","O","button",0,10.0,true
+"20260619-164527","2026-06-19T16:45:31.692562200",2,"2f77c916-43c2-4c68-aad9-c4f2c69acf37","general","http://localhost:3000/",2,9,"click_button_1_x","click","X","button",1,10.0,false
+"20260619-164527","2026-06-19T16:45:31.692562200",2,"2f77c916-43c2-4c68-aad9-c4f2c69acf37","general","http://localhost:3000/",3,9,"click_button_2_다음_문제","click","다음 문제","button",2,5.0,false
+"20260619-164527","2026-06-19T16:45:31.692562200",2,"2f77c916-43c2-4c68-aad9-c4f2c69acf37","general","http://localhost:3000/",4,9,"click_button_3_테마_변경","click","테마 변경","button",3,10.0,false
+"20260619-164527","2026-06-19T16:45:31.692562200",2,"2f77c916-43c2-4c68-aad9-c4f2c69acf37","general","http://localhost:3000/",5,9,"click_button_4_리셋","click","리셋","button",4,10.0,false
+"20260619-164527","2026-06-19T16:45:31.692562200",2,"2f77c916-43c2-4c68-aad9-c4f2c69acf37","general","http://localhost:3000/",6,9,"click_button_5_랜덤_이동","click","랜덤 이동","button",5,10.0,false
+"20260619-164527","2026-06-19T16:45:31.692562200",2,"2f77c916-43c2-4c68-aad9-c4f2c69acf37","general","http://localhost:3000/",7,9,"viewport_mobile_390x844","viewport","모바일 뷰포트 390x844","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:31.692562200",2,"2f77c916-43c2-4c68-aad9-c4f2c69acf37","general","http://localhost:3000/",8,9,"viewport_tablet_768x900","viewport","태블릿 뷰포트 768x900","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:31.692562200",2,"2f77c916-43c2-4c68-aad9-c4f2c69acf37","general","http://localhost:3000/",9,9,"viewport_desktop_1366x900","viewport","데스크톱 뷰포트 1366x900","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:33.342005100",3,"2ee80808-e3b4-4ace-83c9-19ad9668a1be","general","http://localhost:3000/",1,9,"click_button_0_o","click","O","button",0,0.0,false
+"20260619-164527","2026-06-19T16:45:33.342005100",3,"2ee80808-e3b4-4ace-83c9-19ad9668a1be","general","http://localhost:3000/",2,9,"click_button_1_x","click","X","button",1,10.0,true
+"20260619-164527","2026-06-19T16:45:33.342005100",3,"2ee80808-e3b4-4ace-83c9-19ad9668a1be","general","http://localhost:3000/",3,9,"click_button_2_다음_문제","click","다음 문제","button",2,5.0,false
+"20260619-164527","2026-06-19T16:45:33.342005100",3,"2ee80808-e3b4-4ace-83c9-19ad9668a1be","general","http://localhost:3000/",4,9,"click_button_3_테마_변경","click","테마 변경","button",3,10.0,false
+"20260619-164527","2026-06-19T16:45:33.342005100",3,"2ee80808-e3b4-4ace-83c9-19ad9668a1be","general","http://localhost:3000/",5,9,"click_button_4_리셋","click","리셋","button",4,10.0,false
+"20260619-164527","2026-06-19T16:45:33.342005100",3,"2ee80808-e3b4-4ace-83c9-19ad9668a1be","general","http://localhost:3000/",6,9,"click_button_5_랜덤_이동","click","랜덤 이동","button",5,10.0,false
+"20260619-164527","2026-06-19T16:45:33.342005100",3,"2ee80808-e3b4-4ace-83c9-19ad9668a1be","general","http://localhost:3000/",7,9,"viewport_mobile_390x844","viewport","모바일 뷰포트 390x844","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:33.342005100",3,"2ee80808-e3b4-4ace-83c9-19ad9668a1be","general","http://localhost:3000/",8,9,"viewport_tablet_768x900","viewport","태블릿 뷰포트 768x900","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:33.342005100",3,"2ee80808-e3b4-4ace-83c9-19ad9668a1be","general","http://localhost:3000/",9,9,"viewport_desktop_1366x900","viewport","데스크톱 뷰포트 1366x900","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:34.996020400",4,"ad2dcf0f-21af-4ab4-a1da-15d5265c6823","general","http://localhost:3000/",1,9,"click_button_0_o","click","O","button",0,0.0,false
+"20260619-164527","2026-06-19T16:45:34.996020400",4,"ad2dcf0f-21af-4ab4-a1da-15d5265c6823","general","http://localhost:3000/",2,9,"click_button_1_x","click","X","button",1,0.0,false
+"20260619-164527","2026-06-19T16:45:34.996020400",4,"ad2dcf0f-21af-4ab4-a1da-15d5265c6823","general","http://localhost:3000/",3,9,"click_button_2_다음_문제","click","다음 문제","button",2,5.0,false
+"20260619-164527","2026-06-19T16:45:34.996020400",4,"ad2dcf0f-21af-4ab4-a1da-15d5265c6823","general","http://localhost:3000/",4,9,"click_button_3_테마_변경","click","테마 변경","button",3,10.0,true
+"20260619-164527","2026-06-19T16:45:34.996020400",4,"ad2dcf0f-21af-4ab4-a1da-15d5265c6823","general","http://localhost:3000/",5,9,"click_button_4_리셋","click","리셋","button",4,10.0,false
+"20260619-164527","2026-06-19T16:45:34.996020400",4,"ad2dcf0f-21af-4ab4-a1da-15d5265c6823","general","http://localhost:3000/",6,9,"click_button_5_랜덤_이동","click","랜덤 이동","button",5,10.0,false
+"20260619-164527","2026-06-19T16:45:34.996020400",4,"ad2dcf0f-21af-4ab4-a1da-15d5265c6823","general","http://localhost:3000/",7,9,"viewport_mobile_390x844","viewport","모바일 뷰포트 390x844","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:34.996020400",4,"ad2dcf0f-21af-4ab4-a1da-15d5265c6823","general","http://localhost:3000/",8,9,"viewport_tablet_768x900","viewport","태블릿 뷰포트 768x900","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:34.996020400",4,"ad2dcf0f-21af-4ab4-a1da-15d5265c6823","general","http://localhost:3000/",9,9,"viewport_desktop_1366x900","viewport","데스크톱 뷰포트 1366x900","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:36.641016300",5,"2315ba80-ae66-44dc-b6eb-dcf7713ecfd5","general","http://localhost:3000/",1,9,"click_button_0_o","click","O","button",0,0.0,false
+"20260619-164527","2026-06-19T16:45:36.641016300",5,"2315ba80-ae66-44dc-b6eb-dcf7713ecfd5","general","http://localhost:3000/",2,9,"click_button_1_x","click","X","button",1,0.0,false
+"20260619-164527","2026-06-19T16:45:36.641016300",5,"2315ba80-ae66-44dc-b6eb-dcf7713ecfd5","general","http://localhost:3000/",3,9,"click_button_2_다음_문제","click","다음 문제","button",2,5.0,false
+"20260619-164527","2026-06-19T16:45:36.641016300",5,"2315ba80-ae66-44dc-b6eb-dcf7713ecfd5","general","http://localhost:3000/",4,9,"click_button_3_테마_변경","click","테마 변경","button",3,0.0,false
+"20260619-164527","2026-06-19T16:45:36.641016300",5,"2315ba80-ae66-44dc-b6eb-dcf7713ecfd5","general","http://localhost:3000/",5,9,"click_button_4_리셋","click","리셋","button",4,10.0,true
+"20260619-164527","2026-06-19T16:45:36.641016300",5,"2315ba80-ae66-44dc-b6eb-dcf7713ecfd5","general","http://localhost:3000/",6,9,"click_button_5_랜덤_이동","click","랜덤 이동","button",5,10.0,false
+"20260619-164527","2026-06-19T16:45:36.641016300",5,"2315ba80-ae66-44dc-b6eb-dcf7713ecfd5","general","http://localhost:3000/",7,9,"viewport_mobile_390x844","viewport","모바일 뷰포트 390x844","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:36.641016300",5,"2315ba80-ae66-44dc-b6eb-dcf7713ecfd5","general","http://localhost:3000/",8,9,"viewport_tablet_768x900","viewport","태블릿 뷰포트 768x900","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:36.641016300",5,"2315ba80-ae66-44dc-b6eb-dcf7713ecfd5","general","http://localhost:3000/",9,9,"viewport_desktop_1366x900","viewport","데스크톱 뷰포트 1366x900","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:38.285676500",6,"d3cb5748-83e2-4ab8-88f0-fdb50335ae98","general","http://localhost:3000/",1,9,"click_button_0_o","click","O","button",0,0.0,false
+"20260619-164527","2026-06-19T16:45:38.285676500",6,"d3cb5748-83e2-4ab8-88f0-fdb50335ae98","general","http://localhost:3000/",2,9,"click_button_1_x","click","X","button",1,0.0,false
+"20260619-164527","2026-06-19T16:45:38.285676500",6,"d3cb5748-83e2-4ab8-88f0-fdb50335ae98","general","http://localhost:3000/",3,9,"click_button_2_다음_문제","click","다음 문제","button",2,5.0,false
+"20260619-164527","2026-06-19T16:45:38.285676500",6,"d3cb5748-83e2-4ab8-88f0-fdb50335ae98","general","http://localhost:3000/",4,9,"click_button_3_테마_변경","click","테마 변경","button",3,0.0,false
+"20260619-164527","2026-06-19T16:45:38.285676500",6,"d3cb5748-83e2-4ab8-88f0-fdb50335ae98","general","http://localhost:3000/",5,9,"click_button_4_리셋","click","리셋","button",4,0.0,false
+"20260619-164527","2026-06-19T16:45:38.285676500",6,"d3cb5748-83e2-4ab8-88f0-fdb50335ae98","general","http://localhost:3000/",6,9,"click_button_5_랜덤_이동","click","랜덤 이동","button",5,10.0,true
+"20260619-164527","2026-06-19T16:45:38.285676500",6,"d3cb5748-83e2-4ab8-88f0-fdb50335ae98","general","http://localhost:3000/",7,9,"viewport_mobile_390x844","viewport","모바일 뷰포트 390x844","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:38.285676500",6,"d3cb5748-83e2-4ab8-88f0-fdb50335ae98","general","http://localhost:3000/",8,9,"viewport_tablet_768x900","viewport","태블릿 뷰포트 768x900","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:38.285676500",6,"d3cb5748-83e2-4ab8-88f0-fdb50335ae98","general","http://localhost:3000/",9,9,"viewport_desktop_1366x900","viewport","데스크톱 뷰포트 1366x900","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:39.819298100",7,"d536af99-4659-4e68-8baf-421f25ca3e3f","general","http://localhost:3000/",1,9,"click_button_0_o","click","O","button",0,0.0,false
+"20260619-164527","2026-06-19T16:45:39.819298100",7,"d536af99-4659-4e68-8baf-421f25ca3e3f","general","http://localhost:3000/",2,9,"click_button_1_x","click","X","button",1,0.0,false
+"20260619-164527","2026-06-19T16:45:39.819298100",7,"d536af99-4659-4e68-8baf-421f25ca3e3f","general","http://localhost:3000/",3,9,"click_button_2_다음_문제","click","다음 문제","button",2,5.0,false
+"20260619-164527","2026-06-19T16:45:39.819298100",7,"d536af99-4659-4e68-8baf-421f25ca3e3f","general","http://localhost:3000/",4,9,"click_button_3_테마_변경","click","테마 변경","button",3,0.0,false
+"20260619-164527","2026-06-19T16:45:39.819298100",7,"d536af99-4659-4e68-8baf-421f25ca3e3f","general","http://localhost:3000/",5,9,"click_button_4_리셋","click","리셋","button",4,0.0,false
+"20260619-164527","2026-06-19T16:45:39.819298100",7,"d536af99-4659-4e68-8baf-421f25ca3e3f","general","http://localhost:3000/",6,9,"click_button_5_랜덤_이동","click","랜덤 이동","button",5,0.0,false
+"20260619-164527","2026-06-19T16:45:39.819298100",7,"d536af99-4659-4e68-8baf-421f25ca3e3f","general","http://localhost:3000/",7,9,"viewport_mobile_390x844","viewport","모바일 뷰포트 390x844","page",0,10.0,true
+"20260619-164527","2026-06-19T16:45:39.819298100",7,"d536af99-4659-4e68-8baf-421f25ca3e3f","general","http://localhost:3000/",8,9,"viewport_tablet_768x900","viewport","태블릿 뷰포트 768x900","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:39.819298100",7,"d536af99-4659-4e68-8baf-421f25ca3e3f","general","http://localhost:3000/",9,9,"viewport_desktop_1366x900","viewport","데스크톱 뷰포트 1366x900","page",0,10.0,false
+"20260619-164527","2026-06-19T16:45:41.106386900",8,"2fd54c15-a576-454d-b98f-f0185bffa173","general","http://localhost:3000/",1,9,"click_button_0_o","click","O","button",0,0.0,false
+"20260619-164527","2026-06-19T16:45:41.106386900",8,"2fd54c15-a576-454d-b98f-f0185bffa173","general","http://localhost:3000/",2,9,"click_button_1_x","click","X","button",1,0.0,false
+"20260619-164527","2026-06-19T16:45:41.106386900",8,"2fd54c15-a576-454d-b98f-f0185bffa173","general","http://localhost:3000/",3,9,"click_button_2_다음_문제","click","다음 문제","button",2,5.0,false
+"20260619-164527","2026-06-19T16:45:41.106386900",8,"2fd54c15-a576-454d-b98f-f0185bffa173","general","http://localhost:3000/",4,9,"click_button_3_테마_변경","click","테마 변경","button",3,0.0,false
+"20260619-164527","2026-06-19T16:45:41.106386900",8,"2fd54c15-a576-454d-b98f-f0185bffa173","general","http://localhost:3000/",5,9,"click_button_4_리셋","click","리셋","button",4,0.0,false
+"20260619-164527","2026-06-19T16:45:41.106386900",8,"2fd54c15-a576-454d-b98f-f0185bffa173","general","http://localhost:3000/",6,9,"click_button_5_랜덤_이동","click","랜덤 이동","button",5,0.0,false
+"20260619-164527","2026-06-19T16:45:41.106386900",8,"2fd54c15-a576-454d-b98f-f0185bffa173","general","http://localhost:3000/",7,9,"viewport_mobile_390x844","viewport","모바일 뷰포트 390x844","page",0,0.0,false
+"20260619-164527","2026-06-19T16:45:41.106386900",8,"2fd54c15-a576-454d-b98f-f0185bffa173","general","http://localhost:3000/",8,9,"viewport_tablet_768x900","viewport","태블릿 뷰포트 768x900","page",0,10.0,true
+"20260619-164527","2026-06-19T16:45:41.106386900",8,"2fd54c15-a576-454d-b98f-f0185bffa173","general","http://localhost:3000/",9,9,"viewport_desktop_1366x900","viewport","데스크톱 뷰포트 1366x900","page",0,10.0,false

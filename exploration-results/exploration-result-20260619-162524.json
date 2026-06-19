@@ -1,0 +1,378 @@
+{
+  "generatedAt": "2026-06-19T16:25:24.472892200",
+  "targetUrl": "http://localhost:3000/",
+  "maxSteps": 8,
+  "states": [
+    {
+      "stateId": "bfa42179-1168-45ea-9b6e-b6505d822462",
+      "url": "http://localhost:3000/",
+      "title": "O/X 퀴즈",
+      "pageType": "general",
+      "clickableCount": 6,
+      "formCount": 0,
+      "hasModal": false,
+      "consoleErrorCount": 0,
+      "networkErrorCount": 0,
+      "signature": "http://localhost:3000/|O/X 퀴즈|6|0|false"
+    }
+  ],
+  "transitions": [
+    {
+      "from": {
+        "stateId": "bfa42179-1168-45ea-9b6e-b6505d822462",
+        "url": "http://localhost:3000/",
+        "title": "O/X 퀴즈",
+        "pageType": "general",
+        "clickableCount": 6,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|O/X 퀴즈|6|0|false"
+      },
+      "action": {
+        "actionId": "click_button_2_다음_문제",
+        "type": "click",
+        "selector": "button",
+        "index": 2,
+        "label": "다음 문제",
+        "score": 15.0
+      },
+      "to": {
+        "stateId": "bfa42179-1168-45ea-9b6e-b6505d822462",
+        "url": "http://localhost:3000/",
+        "title": "O/X 퀴즈",
+        "pageType": "general",
+        "clickableCount": 6,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|O/X 퀴즈|6|0|false"
+      }
+    },
+    {
+      "from": {
+        "stateId": "bfa42179-1168-45ea-9b6e-b6505d822462",
+        "url": "http://localhost:3000/",
+        "title": "O/X 퀴즈",
+        "pageType": "general",
+        "clickableCount": 6,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|O/X 퀴즈|6|0|false"
+      },
+      "action": {
+        "actionId": "click_button_0_o",
+        "type": "click",
+        "selector": "button",
+        "index": 0,
+        "label": "O",
+        "score": 10.0
+      },
+      "to": {
+        "stateId": "bfa42179-1168-45ea-9b6e-b6505d822462",
+        "url": "http://localhost:3000/",
+        "title": "O/X 퀴즈",
+        "pageType": "general",
+        "clickableCount": 6,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|O/X 퀴즈|6|0|false"
+      }
+    },
+    {
+      "from": {
+        "stateId": "bfa42179-1168-45ea-9b6e-b6505d822462",
+        "url": "http://localhost:3000/",
+        "title": "O/X 퀴즈",
+        "pageType": "general",
+        "clickableCount": 6,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|O/X 퀴즈|6|0|false"
+      },
+      "action": {
+        "actionId": "click_button_1_x",
+        "type": "click",
+        "selector": "button",
+        "index": 1,
+        "label": "X",
+        "score": 10.0
+      },
+      "to": {
+        "stateId": "bfa42179-1168-45ea-9b6e-b6505d822462",
+        "url": "http://localhost:3000/",
+        "title": "O/X 퀴즈",
+        "pageType": "general",
+        "clickableCount": 6,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|O/X 퀴즈|6|0|false"
+      }
+    },
+    {
+      "from": {
+        "stateId": "bfa42179-1168-45ea-9b6e-b6505d822462",
+        "url": "http://localhost:3000/",
+        "title": "O/X 퀴즈",
+        "pageType": "general",
+        "clickableCount": 6,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|O/X 퀴즈|6|0|false"
+      },
+      "action": {
+        "actionId": "click_button_3_테마_변경",
+        "type": "click",
+        "selector": "button",
+        "index": 3,
+        "label": "테마 변경",
+        "score": 10.0
+      },
+      "to": {
+        "stateId": "bfa42179-1168-45ea-9b6e-b6505d822462",
+        "url": "http://localhost:3000/",
+        "title": "O/X 퀴즈",
+        "pageType": "general",
+        "clickableCount": 6,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|O/X 퀴즈|6|0|false"
+      }
+    },
+    {
+      "from": {
+        "stateId": "bfa42179-1168-45ea-9b6e-b6505d822462",
+        "url": "http://localhost:3000/",
+        "title": "O/X 퀴즈",
+        "pageType": "general",
+        "clickableCount": 6,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|O/X 퀴즈|6|0|false"
+      },
+      "action": {
+        "actionId": "click_button_4_리셋",
+        "type": "click",
+        "selector": "button",
+        "index": 4,
+        "label": "리셋",
+        "score": 10.0
+      },
+      "to": {
+        "stateId": "bfa42179-1168-45ea-9b6e-b6505d822462",
+        "url": "http://localhost:3000/",
+        "title": "O/X 퀴즈",
+        "pageType": "general",
+        "clickableCount": 6,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|O/X 퀴즈|6|0|false"
+      }
+    },
+    {
+      "from": {
+        "stateId": "bfa42179-1168-45ea-9b6e-b6505d822462",
+        "url": "http://localhost:3000/",
+        "title": "O/X 퀴즈",
+        "pageType": "general",
+        "clickableCount": 6,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|O/X 퀴즈|6|0|false"
+      },
+      "action": {
+        "actionId": "click_button_5_랜덤_이동",
+        "type": "click",
+        "selector": "button",
+        "index": 5,
+        "label": "랜덤 이동",
+        "score": 10.0
+      },
+      "to": {
+        "stateId": "bfa42179-1168-45ea-9b6e-b6505d822462",
+        "url": "http://localhost:3000/",
+        "title": "O/X 퀴즈",
+        "pageType": "general",
+        "clickableCount": 6,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|O/X 퀴즈|6|0|false"
+      }
+    },
+    {
+      "from": {
+        "stateId": "bfa42179-1168-45ea-9b6e-b6505d822462",
+        "url": "http://localhost:3000/",
+        "title": "O/X 퀴즈",
+        "pageType": "general",
+        "clickableCount": 6,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|O/X 퀴즈|6|0|false"
+      },
+      "action": {
+        "actionId": "viewport_mobile_390x844",
+        "type": "viewport",
+        "selector": "page",
+        "index": 0,
+        "label": "모바일 뷰포트 390x844",
+        "value": "390x844",
+        "score": 10.0
+      },
+      "to": {
+        "stateId": "bfa42179-1168-45ea-9b6e-b6505d822462",
+        "url": "http://localhost:3000/",
+        "title": "O/X 퀴즈",
+        "pageType": "general",
+        "clickableCount": 6,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|O/X 퀴즈|6|0|false"
+      }
+    },
+    {
+      "from": {
+        "stateId": "bfa42179-1168-45ea-9b6e-b6505d822462",
+        "url": "http://localhost:3000/",
+        "title": "O/X 퀴즈",
+        "pageType": "general",
+        "clickableCount": 6,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|O/X 퀴즈|6|0|false"
+      },
+      "action": {
+        "actionId": "viewport_tablet_768x900",
+        "type": "viewport",
+        "selector": "page",
+        "index": 0,
+        "label": "태블릿 뷰포트 768x900",
+        "value": "768x900",
+        "score": 10.0
+      },
+      "to": {
+        "stateId": "bfa42179-1168-45ea-9b6e-b6505d822462",
+        "url": "http://localhost:3000/",
+        "title": "O/X 퀴즈",
+        "pageType": "general",
+        "clickableCount": 6,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|O/X 퀴즈|6|0|false"
+      }
+    }
+  ],
+  "bugs": [
+    {
+      "bugId": "315e6874-5a6a-499e-b324-bc8d6c08c3e4",
+      "severity": "warning",
+      "category": "ui",
+      "title": "No Visible Reaction After Action",
+      "detail": "클릭 이후 URL/DOM 변화가 거의 없습니다: actionId\u003dclick_button_2_다음_문제, type\u003dclick, label\u003d다음 문제, value\u003d",
+      "stateId": "bfa42179-1168-45ea-9b6e-b6505d822462",
+      "actionId": "click_button_2_다음_문제"
+    },
+    {
+      "bugId": "2cb743fe-b2d2-4a1c-8657-1583ef13533d",
+      "severity": "error",
+      "category": "runtime",
+      "title": "Console Error Detected",
+      "detail": "ReferenceError: updateScoreBoard is not defined\nReferenceError: updateScoreBoard is not defined\n    at http://localhost:3000/:606:11",
+      "stateId": "ff5ea255-298c-47c5-80c4-bce1680882c7",
+      "actionId": "click_button_0_o"
+    },
+    {
+      "bugId": "626306f5-76de-479a-88fc-3e91d4017e24",
+      "severity": "warning",
+      "category": "ui",
+      "title": "No Visible Reaction After Action",
+      "detail": "클릭 이후 URL/DOM 변화가 거의 없습니다: actionId\u003dclick_button_0_o, type\u003dclick, label\u003dO, value\u003d",
+      "stateId": "ff5ea255-298c-47c5-80c4-bce1680882c7",
+      "actionId": "click_button_0_o"
+    },
+    {
+      "bugId": "0420ecb2-da65-48b7-a0e7-cfb864348658",
+      "severity": "warning",
+      "category": "ui",
+      "title": "No Visible Reaction After Action",
+      "detail": "클릭 이후 URL/DOM 변화가 거의 없습니다: actionId\u003dclick_button_1_x, type\u003dclick, label\u003dX, value\u003d",
+      "stateId": "2592b5bf-e10f-4dd2-9c7d-3a22a676e1cc",
+      "actionId": "click_button_1_x"
+    },
+    {
+      "bugId": "42ecaeac-7c0a-4bd7-a2f4-365a1f8a7045",
+      "severity": "warning",
+      "category": "ui",
+      "title": "No Visible Reaction After Action",
+      "detail": "클릭 이후 URL/DOM 변화가 거의 없습니다: actionId\u003dclick_button_3_테마_변경, type\u003dclick, label\u003d테마 변경, value\u003d",
+      "stateId": "cc7e75c1-c9ee-4591-87bd-1a56e1182ef3",
+      "actionId": "click_button_3_테마_변경"
+    },
+    {
+      "bugId": "abeeac16-db65-452c-b7e1-8a0ee3894094",
+      "severity": "warning",
+      "category": "ui",
+      "title": "No Visible Reaction After Action",
+      "detail": "클릭 이후 URL/DOM 변화가 거의 없습니다: actionId\u003dclick_button_4_리셋, type\u003dclick, label\u003d리셋, value\u003d",
+      "stateId": "0f22123f-ebcd-4857-bc02-b7341d3794d1",
+      "actionId": "click_button_4_리셋"
+    },
+    {
+      "bugId": "bc70be1e-5015-48ed-a53c-0d0262980076",
+      "severity": "warning",
+      "category": "ui",
+      "title": "No Visible Reaction After Action",
+      "detail": "클릭 이후 URL/DOM 변화가 거의 없습니다: actionId\u003dclick_button_5_랜덤_이동, type\u003dclick, label\u003d랜덤 이동, value\u003d",
+      "stateId": "3bce87c1-c312-4109-83b4-5b15cade1c9d",
+      "actionId": "click_button_5_랜덤_이동"
+    },
+    {
+      "bugId": "2c2e9263-60e4-4ec9-90be-7ca8c8b4dd12",
+      "severity": "warning",
+      "category": "ui",
+      "title": "No Visible Reaction After Action",
+      "detail": "클릭 이후 URL/DOM 변화가 거의 없습니다: actionId\u003dviewport_mobile_390x844, type\u003dviewport, label\u003d모바일 뷰포트 390x844, value\u003d390x844",
+      "stateId": "1e33c7c7-1f00-460b-8e72-400b884f9edd",
+      "actionId": "viewport_mobile_390x844"
+    },
+    {
+      "bugId": "09aa4797-6d60-49fe-85c9-acba55b1a55c",
+      "severity": "warning",
+      "category": "ui",
+      "title": "No Visible Reaction After Action",
+      "detail": "클릭 이후 URL/DOM 변화가 거의 없습니다: actionId\u003dviewport_tablet_768x900, type\u003dviewport, label\u003d태블릿 뷰포트 768x900, value\u003d768x900",
+      "stateId": "e24c8096-44b1-4098-9ac8-e57159885753",
+      "actionId": "viewport_tablet_768x900"
+    }
+  ]
+}

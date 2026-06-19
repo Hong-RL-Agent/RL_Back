@@ -43,6 +43,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -58,8 +60,10 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -119,14 +123,32 @@ public class TestSessionService {
 
         testSessionRepository.save(session);
         progressStore.put(sessionUuid, 0);
-        runTest(sessionUuid, request.targetUrl());
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                runTest(sessionUuid, request.targetUrl());
+            }
+        });
 
         return new TestStartResponse(sessionUuid, session.getStatus().name());
     }
 
     private void assertTargetReachable(String targetUrl) {
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(targetUrl))
+            URI targetUri = URI.create(targetUrl);
+            String host = targetUri.getHost();
+            if (host == null) {
+                throw new IllegalArgumentException("Target URL must include a host");
+            }
+
+            if (host.equalsIgnoreCase("localhost")
+                    || host.equals("127.0.0.1")
+                    || host.equals("::1")
+                    || host.equals("0:0:0:0:0:0:0:1")) {
+                return;
+            }
+
+            HttpRequest request = HttpRequest.newBuilder(targetUri)
                     .timeout(Duration.ofSeconds(5))
                     .GET()
                     .build();
@@ -140,7 +162,7 @@ public class TestSessionService {
     }
 
     public SseEmitter stream(String sessionId) {
-        ensureSession(sessionId);
+        TestSession session = findSession(sessionId);
 
         SseEmitter emitter = new SseEmitter(0L);
         emitters.put(sessionId, emitter);
@@ -149,7 +171,8 @@ public class TestSessionService {
         emitter.onTimeout(() -> emitters.remove(sessionId));
         emitter.onError(error -> emitters.remove(sessionId));
 
-        send(sessionId, "status", StreamEvent.status("running"));
+        String currentStatus = session.getStatus().name().toLowerCase();
+        send(sessionId, "status", StreamEvent.status(currentStatus));
         send(sessionId, "progress", StreamEvent.progress(progressStore.getOrDefault(sessionId, 0)));
         return emitter;
     }
@@ -425,11 +448,13 @@ public class TestSessionService {
 
             ProcessBuilder processBuilder = new ProcessBuilder(
                     javaExecutable(),
+                    "-Dfile.encoding=UTF-8",
+                    "-Dplaywright.cli.dir=" + playwrightDriverDirectory(),
                     "-cp",
                     playwrightChildClasspath(),
-                    "com.example.demo.engine.ExplorerMain",
+                    "com.example.demo.engine.Site001DeepExplorerMain",
                     targetUrl,
-                    String.valueOf(playwrightMaxSteps),
+                    String.valueOf(Math.max(playwrightMaxSteps, 20)),
                     "true"
             );
             processBuilder.redirectErrorStream(true);
@@ -456,20 +481,33 @@ public class TestSessionService {
             }
             if (exitCode != 0) {
                 throw new IOException("Playwright child process exited with code " + exitCode + ": "
-                        + String.join(" | ", lines.stream().limit(5).toList()));
+                        + String.join(" | ", lines.stream().limit(30).toList()));
             }
 
             int step = 0;
+            Set<String> emittedFindings = new HashSet<>();
             for (String line : lines) {
                 if (line == null || line.isBlank()) {
                     continue;
                 }
 
                 String message = line.strip();
-                if (message.contains("STEP ")) {
+                if (message.contains("STEP ") || message.contains("[TICK ")) {
                     step++;
                     int progress = Math.min(95, 10 + (step * 80 / Math.max(1, playwrightMaxSteps)));
                     publishProgress(sessionId, progress, "Action", message);
+
+                    int findingsIndex = message.indexOf("findings=");
+                    if (findingsIndex >= 0) {
+                        String findingsText = message.substring(findingsIndex + "findings=".length()).trim();
+                        for (String finding : findingsText.split(" \\| ")) {
+                            if (!finding.isBlank() && emittedFindings.add(finding)) {
+                                saveBug(sessionId, null, "PLAYWRIGHT_FINDING", detectScope(finding), 3, finding);
+                                send(sessionId, "issue", StreamEvent.issue(
+                                        detectIssueLabel(finding), finding, "warning"));
+                            }
+                        }
+                    }
                     continue;
                 }
 
@@ -757,15 +795,18 @@ public class TestSessionService {
     }
 
     private String playwrightChildClasspath() {
-        String userHome = System.getProperty("user.home");
         return String.join(System.getProperty("path.separator"),
                 Path.of("build", "classes", "java", "main").toAbsolutePath().toString(),
                 Path.of("build", "resources", "main").toAbsolutePath().toString(),
-                Path.of(userHome, ".m2", "repository", "com", "microsoft", "playwright", "playwright", "1.42.0", "playwright-1.42.0.jar").toString(),
-                Path.of(userHome, ".m2", "repository", "com", "microsoft", "playwright", "driver", "1.42.0", "driver-1.42.0.jar").toString(),
-                Path.of(userHome, ".m2", "repository", "com", "microsoft", "playwright", "driver-bundle", "1.42.0", "driver-bundle-1.42.0.jar").toString(),
-                Path.of(userHome, ".m2", "repository", "com", "google", "code", "gson", "gson", "2.10.1", "gson-2.10.1.jar").toString()
+                Path.of("build", "runtime-libs").toAbsolutePath()
+                        + System.getProperty("file.separator") + "*"
         );
+    }
+
+    private String playwrightDriverDirectory() {
+        return Path.of("build", "playwright-driver", "driver", "win32_x64")
+                .toAbsolutePath()
+                .toString();
     }
 
 }

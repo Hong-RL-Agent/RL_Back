@@ -1,0 +1,367 @@
+{
+  "generatedAt": "2026-06-19T16:48:47.593595300",
+  "targetUrl": "http://localhost:3000/",
+  "maxSteps": 8,
+  "states": [
+    {
+      "stateId": "5ddd7051-5201-4932-a6a6-7b99737bcbec",
+      "url": "http://localhost:3000/",
+      "title": "BookHaven - 온라인 서점",
+      "pageType": "general",
+      "clickableCount": 35,
+      "formCount": 0,
+      "hasModal": false,
+      "consoleErrorCount": 0,
+      "networkErrorCount": 0,
+      "signature": "http://localhost:3000/|BookHaven - 온라인 서점|35|0|false"
+    }
+  ],
+  "transitions": [
+    {
+      "from": {
+        "stateId": "5ddd7051-5201-4932-a6a6-7b99737bcbec",
+        "url": "http://localhost:3000/",
+        "title": "BookHaven - 온라인 서점",
+        "pageType": "general",
+        "clickableCount": 35,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|BookHaven - 온라인 서점|35|0|false"
+      },
+      "action": {
+        "actionId": "click_button_0_장바구니",
+        "type": "click",
+        "selector": "button",
+        "index": 0,
+        "label": "🛒 장바구니",
+        "score": 14.0
+      },
+      "to": {
+        "stateId": "5ddd7051-5201-4932-a6a6-7b99737bcbec",
+        "url": "http://localhost:3000/",
+        "title": "BookHaven - 온라인 서점",
+        "pageType": "general",
+        "clickableCount": 35,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|BookHaven - 온라인 서점|35|0|false"
+      }
+    },
+    {
+      "from": {
+        "stateId": "5ddd7051-5201-4932-a6a6-7b99737bcbec",
+        "url": "http://localhost:3000/",
+        "title": "BookHaven - 온라인 서점",
+        "pageType": "general",
+        "clickableCount": 35,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|BookHaven - 온라인 서점|35|0|false"
+      },
+      "action": {
+        "actionId": "click_button_1_도서_탐색하기",
+        "type": "click",
+        "selector": "button",
+        "index": 1,
+        "label": "📚 도서 탐색하기",
+        "score": 10.0
+      },
+      "to": {
+        "stateId": "5ddd7051-5201-4932-a6a6-7b99737bcbec",
+        "url": "http://localhost:3000/",
+        "title": "BookHaven - 온라인 서점",
+        "pageType": "general",
+        "clickableCount": 35,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|BookHaven - 온라인 서점|35|0|false"
+      }
+    },
+    {
+      "from": {
+        "stateId": "5ddd7051-5201-4932-a6a6-7b99737bcbec",
+        "url": "http://localhost:3000/",
+        "title": "BookHaven - 온라인 서점",
+        "pageType": "general",
+        "clickableCount": 35,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|BookHaven - 온라인 서점|35|0|false"
+      },
+      "action": {
+        "actionId": "click_button_2_전체",
+        "type": "click",
+        "selector": "button",
+        "index": 2,
+        "label": "전체",
+        "score": 10.0
+      },
+      "to": {
+        "stateId": "5ddd7051-5201-4932-a6a6-7b99737bcbec",
+        "url": "http://localhost:3000/",
+        "title": "BookHaven - 온라인 서점",
+        "pageType": "general",
+        "clickableCount": 35,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|BookHaven - 온라인 서점|35|0|false"
+      }
+    },
+    {
+      "from": {
+        "stateId": "5ddd7051-5201-4932-a6a6-7b99737bcbec",
+        "url": "http://localhost:3000/",
+        "title": "BookHaven - 온라인 서점",
+        "pageType": "general",
+        "clickableCount": 35,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|BookHaven - 온라인 서점|35|0|false"
+      },
+      "action": {
+        "actionId": "click_button_3_소설",
+        "type": "click",
+        "selector": "button",
+        "index": 3,
+        "label": "소설",
+        "score": 10.0
+      },
+      "to": {
+        "stateId": "5ddd7051-5201-4932-a6a6-7b99737bcbec",
+        "url": "http://localhost:3000/",
+        "title": "BookHaven - 온라인 서점",
+        "pageType": "general",
+        "clickableCount": 35,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|BookHaven - 온라인 서점|35|0|false"
+      }
+    },
+    {
+      "from": {
+        "stateId": "5ddd7051-5201-4932-a6a6-7b99737bcbec",
+        "url": "http://localhost:3000/",
+        "title": "BookHaven - 온라인 서점",
+        "pageType": "general",
+        "clickableCount": 35,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|BookHaven - 온라인 서점|35|0|false"
+      },
+      "action": {
+        "actionId": "click_button_4_에세이",
+        "type": "click",
+        "selector": "button",
+        "index": 4,
+        "label": "에세이",
+        "score": 10.0
+      },
+      "to": {
+        "stateId": "5ddd7051-5201-4932-a6a6-7b99737bcbec",
+        "url": "http://localhost:3000/",
+        "title": "BookHaven - 온라인 서점",
+        "pageType": "general",
+        "clickableCount": 35,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|BookHaven - 온라인 서점|35|0|false"
+      }
+    },
+    {
+      "from": {
+        "stateId": "5ddd7051-5201-4932-a6a6-7b99737bcbec",
+        "url": "http://localhost:3000/",
+        "title": "BookHaven - 온라인 서점",
+        "pageType": "general",
+        "clickableCount": 35,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|BookHaven - 온라인 서점|35|0|false"
+      },
+      "action": {
+        "actionId": "click_button_5_컴퓨터it",
+        "type": "click",
+        "selector": "button",
+        "index": 5,
+        "label": "컴퓨터/IT",
+        "score": 10.0
+      },
+      "to": {
+        "stateId": "5ddd7051-5201-4932-a6a6-7b99737bcbec",
+        "url": "http://localhost:3000/",
+        "title": "BookHaven - 온라인 서점",
+        "pageType": "general",
+        "clickableCount": 35,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|BookHaven - 온라인 서점|35|0|false"
+      }
+    },
+    {
+      "from": {
+        "stateId": "5ddd7051-5201-4932-a6a6-7b99737bcbec",
+        "url": "http://localhost:3000/",
+        "title": "BookHaven - 온라인 서점",
+        "pageType": "general",
+        "clickableCount": 35,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|BookHaven - 온라인 서점|35|0|false"
+      },
+      "action": {
+        "actionId": "click_button_6_경제경영",
+        "type": "click",
+        "selector": "button",
+        "index": 6,
+        "label": "경제/경영",
+        "score": 10.0
+      },
+      "to": {
+        "stateId": "5ddd7051-5201-4932-a6a6-7b99737bcbec",
+        "url": "http://localhost:3000/",
+        "title": "BookHaven - 온라인 서점",
+        "pageType": "general",
+        "clickableCount": 35,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|BookHaven - 온라인 서점|35|0|false"
+      }
+    },
+    {
+      "from": {
+        "stateId": "5ddd7051-5201-4932-a6a6-7b99737bcbec",
+        "url": "http://localhost:3000/",
+        "title": "BookHaven - 온라인 서점",
+        "pageType": "general",
+        "clickableCount": 35,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|BookHaven - 온라인 서점|35|0|false"
+      },
+      "action": {
+        "actionId": "click_button_7_역사",
+        "type": "click",
+        "selector": "button",
+        "index": 7,
+        "label": "역사",
+        "score": 10.0
+      },
+      "to": {
+        "stateId": "5ddd7051-5201-4932-a6a6-7b99737bcbec",
+        "url": "http://localhost:3000/",
+        "title": "BookHaven - 온라인 서점",
+        "pageType": "general",
+        "clickableCount": 35,
+        "formCount": 0,
+        "hasModal": false,
+        "consoleErrorCount": 0,
+        "networkErrorCount": 0,
+        "signature": "http://localhost:3000/|BookHaven - 온라인 서점|35|0|false"
+      }
+    }
+  ],
+  "bugs": [
+    {
+      "bugId": "30e2ed9d-141f-4c32-85fb-e8dd139997ef",
+      "severity": "warning",
+      "category": "ui",
+      "title": "No Visible Reaction After Action",
+      "detail": "클릭 이후 URL/DOM 변화가 거의 없습니다: actionId\u003dclick_button_0_장바구니, type\u003dclick, label\u003d🛒 장바구니, value\u003d",
+      "stateId": "5ddd7051-5201-4932-a6a6-7b99737bcbec",
+      "actionId": "click_button_0_장바구니"
+    },
+    {
+      "bugId": "8ded9c97-149b-4b17-a7b8-df453c4f162d",
+      "severity": "warning",
+      "category": "logic",
+      "title": "Action Execution Failed",
+      "detail": "행동 실행에 실패했습니다: actionId\u003dclick_button_1_도서_탐색하기, type\u003dclick, label\u003d📚 도서 탐색하기, value\u003d",
+      "stateId": "e7e010b9-30af-4346-b690-6f700b2a2d77",
+      "actionId": "click_button_1_도서_탐색하기"
+    },
+    {
+      "bugId": "6311d39d-2596-4e20-b670-622c11cca8fa",
+      "severity": "warning",
+      "category": "logic",
+      "title": "Action Execution Failed",
+      "detail": "행동 실행에 실패했습니다: actionId\u003dclick_button_2_전체, type\u003dclick, label\u003d전체, value\u003d",
+      "stateId": "949cf731-d8c3-4e80-8d4f-33f92f776fc0",
+      "actionId": "click_button_2_전체"
+    },
+    {
+      "bugId": "f79e6202-9aee-44c8-93e5-e93ec640e987",
+      "severity": "warning",
+      "category": "logic",
+      "title": "Action Execution Failed",
+      "detail": "행동 실행에 실패했습니다: actionId\u003dclick_button_3_소설, type\u003dclick, label\u003d소설, value\u003d",
+      "stateId": "0cc1619f-c3f9-4f4a-9c94-a632f7bf7cf8",
+      "actionId": "click_button_3_소설"
+    },
+    {
+      "bugId": "57be7cac-e396-48d1-871d-43784ab70f99",
+      "severity": "warning",
+      "category": "logic",
+      "title": "Action Execution Failed",
+      "detail": "행동 실행에 실패했습니다: actionId\u003dclick_button_4_에세이, type\u003dclick, label\u003d에세이, value\u003d",
+      "stateId": "cacdec29-b2c4-4485-b903-76841198e512",
+      "actionId": "click_button_4_에세이"
+    },
+    {
+      "bugId": "6843f541-abc1-4a5f-ae37-07aa09c0a18f",
+      "severity": "warning",
+      "category": "logic",
+      "title": "Action Execution Failed",
+      "detail": "행동 실행에 실패했습니다: actionId\u003dclick_button_5_컴퓨터it, type\u003dclick, label\u003d컴퓨터/IT, value\u003d",
+      "stateId": "61d8fdd7-4bad-406a-ad41-b561d6fee9c4",
+      "actionId": "click_button_5_컴퓨터it"
+    },
+    {
+      "bugId": "85b85af4-d944-48c7-918b-b8feaeab9ca9",
+      "severity": "warning",
+      "category": "logic",
+      "title": "Action Execution Failed",
+      "detail": "행동 실행에 실패했습니다: actionId\u003dclick_button_6_경제경영, type\u003dclick, label\u003d경제/경영, value\u003d",
+      "stateId": "de6bbca2-afbd-4426-b107-d59db50cc1a5",
+      "actionId": "click_button_6_경제경영"
+    },
+    {
+      "bugId": "e76eb606-b88d-4998-8474-c4b5f0d0f822",
+      "severity": "warning",
+      "category": "logic",
+      "title": "Action Execution Failed",
+      "detail": "행동 실행에 실패했습니다: actionId\u003dclick_button_7_역사, type\u003dclick, label\u003d역사, value\u003d",
+      "stateId": "80bb6ff7-d251-4510-86fe-42f9fce7a8f6",
+      "actionId": "click_button_7_역사"
+    }
+  ]
+}
