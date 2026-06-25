@@ -28,12 +28,14 @@ import com.jaws.jawsback.entity.ErrorScopeType;
 import com.jaws.jawsback.entity.PdfReport;
 import com.jaws.jawsback.entity.SessionStatus;
 import com.jaws.jawsback.entity.TestSession;
+import com.jaws.jawsback.entity.TickLog;
 import com.jaws.jawsback.entity.User;
 import com.jaws.jawsback.exception.ResourceNotFoundException;
 import com.jaws.jawsback.repository.ActionLogRepository;
 import com.jaws.jawsback.repository.DetectedBugRepository;
 import com.jaws.jawsback.repository.PdfReportRepository;
 import com.jaws.jawsback.repository.TestSessionRepository;
+import com.jaws.jawsback.repository.TickLogRepository;
 import com.jaws.jawsback.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -57,6 +59,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -65,12 +68,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @RequiredArgsConstructor
@@ -80,6 +84,7 @@ public class TestSessionService {
     private static final DateTimeFormatter HISTORY_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy.MM.dd");
 
     private final TestSessionRepository testSessionRepository;
+    private final TickLogRepository tickLogRepository;
     private final ActionLogRepository actionLogRepository;
     private final DetectedBugRepository detectedBugRepository;
     private final PdfReportRepository pdfReportRepository;
@@ -455,19 +460,23 @@ public class TestSessionService {
                     "com.example.demo.engine.Site001DeepExplorerMain",
                     targetUrl,
                     String.valueOf(Math.max(playwrightMaxSteps, 20)),
-                    "true"
+                    "true",
+                    captureDirectory(sessionId).toString()
             );
             processBuilder.redirectErrorStream(true);
 
             process = processBuilder.start();
-            Process runningProcess = process;
-            CompletableFuture<List<String>> outputFuture = CompletableFuture.supplyAsync(() -> {
-                try (var reader = runningProcess.inputReader(StandardCharsets.UTF_8)) {
-                    return reader.lines().toList();
-                } catch (IOException e) {
-                    return List.of("Unable to read Playwright output: " + e.getMessage());
+            AtomicInteger step = new AtomicInteger(0);
+            AtomicBoolean sawOutput = new AtomicBoolean(false);
+            Set<String> emittedFindings = new HashSet<>();
+
+            try (var reader = process.inputReader(StandardCharsets.UTF_8)) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sawOutput.set(true);
+                    handlePlaywrightOutputLine(sessionId, line, step, emittedFindings);
                 }
-            });
+            }
 
             if (!process.waitFor(90, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
@@ -475,54 +484,11 @@ public class TestSessionService {
             }
 
             int exitCode = process.exitValue();
-            List<String> lines = outputFuture.get(3, TimeUnit.SECONDS);
-            if (lines.isEmpty()) {
+            if (!sawOutput.get()) {
                 throw new IOException("Playwright child process produced no output");
             }
             if (exitCode != 0) {
-                throw new IOException("Playwright child process exited with code " + exitCode + ": "
-                        + String.join(" | ", lines.stream().limit(30).toList()));
-            }
-
-            int step = 0;
-            Set<String> emittedFindings = new HashSet<>();
-            for (String line : lines) {
-                if (line == null || line.isBlank()) {
-                    continue;
-                }
-
-                String message = line.strip();
-                if (message.contains("STEP ") || message.contains("[TICK ")) {
-                    step++;
-                    int progress = Math.min(95, 10 + (step * 80 / Math.max(1, playwrightMaxSteps)));
-                    publishProgress(sessionId, progress, "Action", message);
-
-                    int findingsIndex = message.indexOf("findings=");
-                    if (findingsIndex >= 0) {
-                        String findingsText = message.substring(findingsIndex + "findings=".length()).trim();
-                        for (String finding : findingsText.split(" \\| ")) {
-                            if (!finding.isBlank() && emittedFindings.add(finding)) {
-                                saveBug(sessionId, null, "PLAYWRIGHT_FINDING", detectScope(finding), 3, finding);
-                                send(sessionId, "issue", StreamEvent.issue(
-                                        detectIssueLabel(finding), finding, "warning"));
-                            }
-                        }
-                    }
-                    continue;
-                }
-
-                if (message.contains("[BUG]")) {
-                    saveBug(sessionId, null, "PLAYWRIGHT_BUG", detectScope(message),
-                            message.toLowerCase().contains("error") ? 4 : 3, message);
-                    send(sessionId, "issue", StreamEvent.issue(detectIssueLabel(message), message,
-                            message.toLowerCase().contains("error") ? "error" : "warning"));
-                    continue;
-                }
-
-                if (message.contains("[RESULT]") || message.contains("[STATE]") || message.contains("[INFO]") || message.contains("[STOP]")) {
-                    saveAction(sessionId, "Playwright", null, message);
-                    send(sessionId, "log", StreamEvent.log("State", message));
-                }
+                throw new IOException("Playwright child process exited with code " + exitCode);
             }
 
             markCompleted(sessionId);
@@ -542,6 +508,83 @@ public class TestSessionService {
             saveAction(sessionId, "Error", null, "Playwright child process failed: " + e.getMessage());
             send(sessionId, "log", StreamEvent.log("Error", "Playwright child process failed: " + e.getMessage()));
             return false;
+        }
+    }
+
+    private void handlePlaywrightOutputLine(String sessionId, String line, AtomicInteger step,
+                                            Set<String> emittedFindings) {
+        if (line == null || line.isBlank()) {
+            return;
+        }
+
+        String message = line.strip();
+        if (message.startsWith("[TICK_DATA] ")) {
+            String payload = message.substring("[TICK_DATA] ".length());
+            saveTick(sessionId, payload);
+            publishTickInference(sessionId, payload);
+            return;
+        }
+        if (message.contains("STEP ") || message.contains("[TICK ")) {
+            int currentStep = step.incrementAndGet();
+            int progress = Math.min(95, 10 + (currentStep * 80 / Math.max(1, playwrightMaxSteps)));
+            publishProgress(sessionId, progress, "Action", message);
+
+            int findingsIndex = message.indexOf("findings=");
+            if (findingsIndex >= 0) {
+                String findingsText = message.substring(findingsIndex + "findings=".length()).trim();
+                for (String finding : findingsText.split(" \\| ")) {
+                    if (!finding.isBlank() && emittedFindings.add(finding)) {
+                        saveBug(sessionId, null, "PLAYWRIGHT_FINDING", detectScope(finding), 3, finding);
+                        send(sessionId, "issue", StreamEvent.issue(
+                                detectIssueLabel(finding), finding, "warning"));
+                    }
+                }
+            }
+            return;
+        }
+
+        if (message.contains("[BUG]")) {
+            saveBug(sessionId, null, "PLAYWRIGHT_BUG", detectScope(message),
+                    message.toLowerCase().contains("error") ? 4 : 3, message);
+            send(sessionId, "issue", StreamEvent.issue(detectIssueLabel(message), message,
+                    message.toLowerCase().contains("error") ? "error" : "warning"));
+            return;
+        }
+
+        if (message.contains("[RESULT]") || message.contains("[STATE]") || message.contains("[INFO]")
+                || message.contains("[STOP]") || message.contains("[OUTPUT DIR]")) {
+            saveAction(sessionId, "Playwright", null, message);
+            send(sessionId, "log", StreamEvent.log("State", message));
+        }
+    }
+
+    private void publishTickInference(String sessionId, String payload) {
+        try {
+            JsonNode tick = objectMapper.readTree(payload);
+            JsonNode action = tick.path("action");
+            JsonNode after = tick.path("after");
+            String actionId = textValue(action, "actionId", "initial_state");
+            String actionType = textValue(action, "type", "-");
+            int candidateCount = tick.path("actionOptionCount").asInt(0);
+            boolean error = tick.path("error").asBoolean(false);
+            String findings = textValue(tick, "errorReasons", "");
+            String screenshotPath = textValue(tick, "screenshotPath", "");
+            String url = textValue(after, "url", "");
+            String message = "tick=" + tick.path("tick").asInt(0)
+                    + ", selected=" + actionId
+                    + ", type=" + actionType
+                    + ", candidates=" + candidateCount
+                    + ", error=" + error
+                    + (findings.isBlank() ? "" : ", findings=" + findings)
+                    + (url.isBlank() ? "" : ", url=" + url);
+            saveAction(sessionId, "AI", null, message);
+            send(sessionId, "log", StreamEvent.log("AI", message));
+            if (!screenshotPath.isBlank()) {
+                send(sessionId, "log", StreamEvent.log("Preview",
+                        "/api/test/" + sessionId + "/screenshots/" + screenshotPath));
+            }
+        } catch (Exception e) {
+            saveAction(sessionId, "AI", null, "Unable to parse tick inference: " + e.getMessage());
         }
     }
 
@@ -717,6 +760,42 @@ public class TestSessionService {
         });
     }
 
+    private void saveTick(String sessionId, String payload) {
+        try {
+            JsonNode tick = objectMapper.readTree(payload);
+            JsonNode action = tick.path("action");
+            JsonNode result = tick.path("result");
+            transactionTemplate.executeWithoutResult(status -> {
+                TestSession session = testSessionRepository.findBySessionUuid(sessionId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Session not found."));
+                tickLogRepository.save(TickLog.builder()
+                        .session(session)
+                        .runId(textValue(tick, "runId", "unknown"))
+                        .tickNumber(tick.path("tick").asInt(0))
+                        .tickStatus(textValue(tick, "status", "unknown"))
+                        .capturedAt(textValue(tick, "capturedAt", null))
+                        .actionId(textValue(action, "actionId", null))
+                        .actionType(textValue(action, "type", null))
+                        .actionLabel(textValue(action, "label", null))
+                        .candidateCount(tick.path("actionOptionCount").asInt(0))
+                        .executionSuccess(result.isMissingNode() || result.isNull() ? null : result.path("success").asBoolean())
+                        .domChanged(result.isMissingNode() || result.isNull() ? null : result.path("domChanged").asBoolean())
+                        .networkEventsAdded(tick.path("networkEventsAdded").asInt(0))
+                        .errorDetected(tick.path("error").asBoolean(false))
+                        .errorReasons(textValue(tick, "errorReasons", null))
+                        .payload(payload)
+                        .build());
+            });
+        } catch (Exception e) {
+            saveAction(sessionId, "Error", null, "Unable to persist tick data: " + e.getMessage());
+        }
+    }
+
+    private String textValue(JsonNode node, String field, String fallback) {
+        JsonNode value = node.path(field);
+        return value.isMissingNode() || value.isNull() || value.asText().isBlank() ? fallback : value.asText();
+    }
+
     private void saveBug(String sessionId, Long actionId, String categoryCode, ErrorScopeType scope,
                          int severity, String message) {
         transactionTemplate.executeWithoutResult(status -> {
@@ -807,6 +886,24 @@ public class TestSessionService {
         return Path.of("build", "playwright-driver", "driver", "win32_x64")
                 .toAbsolutePath()
                 .toString();
+    }
+
+    public Path screenshotPath(String sessionId, String fileName) {
+        ensureSession(sessionId);
+        if (fileName == null || fileName.isBlank() || fileName.contains("/") || fileName.contains("\\")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid screenshot file name.");
+        }
+
+        Path directory = captureDirectory(sessionId);
+        Path screenshot = directory.resolve(fileName).normalize();
+        if (!screenshot.startsWith(directory) || !Files.exists(screenshot)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Screenshot not found.");
+        }
+        return screenshot;
+    }
+
+    private Path captureDirectory(String sessionId) {
+        return Paths.get("build", "live-captures", sessionId).toAbsolutePath().normalize();
     }
 
 }

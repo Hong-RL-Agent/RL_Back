@@ -15,5 +15,9 @@ public interface TestSessionRepository extends JpaRepository<TestSession, Long> 
 
     List<TestSession> findTop20ByOrderByCreatedAtDesc();
 
+    List<TestSession> findAllByOrderByCreatedAtDesc();
+
+    long countByUserId(Long userId);
+
     long countByStatus(SessionStatus status);
 }

@@ -10,7 +10,7 @@ CREATE TABLE user_account (
 );
 
 -- test_session
-CREATE TYPE session_status AS ENUM ('READY', 'RUNNING', 'COMPLETED', 'FAILED');
+CREATE TYPE session_status AS ENUM ('READY', 'RUNNING', 'STOPPED', 'COMPLETED', 'FAILED');
 
 CREATE TABLE test_session (
                               id           BIGSERIAL PRIMARY KEY,

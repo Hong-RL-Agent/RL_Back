@@ -10,6 +10,8 @@ import com.jaws.jawsback.dto.TestDto.TestStartResponse;
 import com.jaws.jawsback.service.TestSessionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +22,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.net.MalformedURLException;
+import java.nio.file.Path;
 
 @RestController
 @RequestMapping("/api/test")
@@ -61,5 +66,15 @@ public class TestController {
     @PostMapping("/{sessionId}/report")
     public ResponseEntity<TestReportResponse> report(@PathVariable String sessionId) {
         return ResponseEntity.status(HttpStatus.CREATED).body(testSessionService.report(sessionId));
+    }
+
+    @GetMapping(value = "/{sessionId}/screenshots/{fileName}", produces = MediaType.IMAGE_PNG_VALUE)
+    public ResponseEntity<Resource> screenshot(
+            @PathVariable String sessionId,
+            @PathVariable String fileName
+    ) throws MalformedURLException {
+        Path screenshotPath = testSessionService.screenshotPath(sessionId, fileName);
+        Resource resource = new UrlResource(screenshotPath.toUri());
+        return ResponseEntity.ok(resource);
     }
 }

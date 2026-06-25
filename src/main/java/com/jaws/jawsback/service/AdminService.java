@@ -10,14 +10,20 @@ import com.jaws.jawsback.dto.AdminDto.AdminSessionDetailResponse;
 import com.jaws.jawsback.dto.AdminDto.AdminSessionItem;
 import com.jaws.jawsback.dto.AdminDto.AdminSessionsResponse;
 import com.jaws.jawsback.dto.AdminDto.AdminSummaryResponse;
+import com.jaws.jawsback.dto.AdminDto.AdminTickItem;
+import com.jaws.jawsback.dto.AdminDto.AdminTicksResponse;
+import com.jaws.jawsback.dto.AdminDto.AdminUserItem;
+import com.jaws.jawsback.dto.AdminDto.AdminUsersResponse;
 import com.jaws.jawsback.entity.ActionLog;
 import com.jaws.jawsback.entity.DetectedBug;
 import com.jaws.jawsback.entity.SessionStatus;
 import com.jaws.jawsback.entity.TestSession;
+import com.jaws.jawsback.entity.TickLog;
 import com.jaws.jawsback.exception.ResourceNotFoundException;
 import com.jaws.jawsback.repository.ActionLogRepository;
 import com.jaws.jawsback.repository.DetectedBugRepository;
 import com.jaws.jawsback.repository.TestSessionRepository;
+import com.jaws.jawsback.repository.TickLogRepository;
 import com.jaws.jawsback.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -33,8 +39,10 @@ import java.util.List;
 public class AdminService {
 
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private static final DateTimeFormatter DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     private final TestSessionRepository testSessionRepository;
+    private final TickLogRepository tickLogRepository;
     private final ActionLogRepository actionLogRepository;
     private final DetectedBugRepository detectedBugRepository;
     private final UserRepository userRepository;
@@ -56,7 +64,7 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public AdminSessionsResponse sessions() {
-        List<AdminSessionItem> sessions = testSessionRepository.findTop20ByOrderByCreatedAtDesc().stream()
+        List<AdminSessionItem> sessions = testSessionRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(this::toSessionItem)
                 .toList();
         return new AdminSessionsResponse(sessions);
@@ -64,7 +72,7 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public AdminActivitiesResponse activities() {
-        List<AdminActivityItem> activities = actionLogRepository.findTop20ByOrderByCreatedAtDesc().stream()
+        List<AdminActivityItem> activities = actionLogRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(log -> new AdminActivityItem(
                         log.getId(),
                         log.getSession().getSessionUuid(),
@@ -79,7 +87,7 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public AdminIssuesResponse issues() {
-        List<AdminIssueItem> issues = detectedBugRepository.findTop20ByOrderByIdDesc().stream()
+        List<AdminIssueItem> issues = detectedBugRepository.findAllByOrderByIdDesc().stream()
                 .map(this::toIssueItem)
                 .toList();
         return new AdminIssuesResponse(issues);
@@ -90,8 +98,11 @@ public class AdminService {
         long actions = actionLogRepository.count();
         long issues = detectedBugRepository.count();
         long running = testSessionRepository.countByStatus(SessionStatus.RUNNING);
+        long ticks = tickLogRepository.count();
 
         return new AdminLogCollectorsResponse(List.of(
+                new AdminLogCollectorItem("Tick Data Collector", "state/action/network snapshots",
+                        running > 0 ? "collecting" : "idle", ticks + " ticks", "live"),
                 new AdminLogCollectorItem("Action Log Collector", "browser actions", running > 0 ? "collecting" : "idle",
                         actions + " logs", "live"),
                 new AdminLogCollectorItem("Issue Detector", "console/network/oracle", running > 0 ? "collecting" : "idle",
@@ -99,6 +110,34 @@ public class AdminService {
                 new AdminLogCollectorItem("Session Queue", "test sessions", running > 0 ? "collecting" : "idle",
                         running + " running", "live")
         ));
+    }
+
+    @Transactional(readOnly = true)
+    public AdminTicksResponse ticks(String sessionId) {
+        List<TickLog> records = sessionId == null || sessionId.isBlank()
+                ? tickLogRepository.findAllByOrderByCreatedAtDesc()
+                : tickLogRepository.findBySessionSessionUuidOrderByTickNumberDesc(sessionId);
+        long total = sessionId == null || sessionId.isBlank()
+                ? tickLogRepository.count()
+                : tickLogRepository.countBySessionSessionUuid(sessionId);
+        return new AdminTicksResponse(total, records.stream().map(this::toTickItem).toList());
+    }
+
+    @Transactional(readOnly = true)
+    public AdminUsersResponse users() {
+        List<AdminUserItem> users = userRepository.findAll().stream()
+                .map(user -> new AdminUserItem(
+                        user.getId(),
+                        user.getUserName(),
+                        user.getEmail(),
+                        user.getRole().name(),
+                        user.getCreatedAt() == null ? "-" : user.getCreatedAt().format(DATE_TIME_FORMAT),
+                        testSessionRepository.countByUserId(user.getId()),
+                        detectedBugRepository.countBySessionUserId(user.getId()),
+                        tickLogRepository.countBySessionUserId(user.getId())
+                ))
+                .toList();
+        return new AdminUsersResponse(users);
     }
 
     @Transactional(readOnly = true)
@@ -143,11 +182,33 @@ public class AdminService {
         return new AdminIssueItem(
                 bug.getId(),
                 severity,
-                nullToDash(bug.getCategoryCode()),
+                nullToDash(bug.getErrorMessage()),
                 bug.getSession().getSessionUuid(),
                 bug.getSession().getTargetUrl(),
-                "-",
-                bug.getSession().getStatus() == SessionStatus.COMPLETED ? "Reviewed" : "Open"
+                bug.getAction() == null ? "-" : formatTime(bug.getAction().getCreatedAt()),
+                "Detected"
+        );
+    }
+
+    private AdminTickItem toTickItem(TickLog tick) {
+        return new AdminTickItem(
+                tick.getId(),
+                tick.getSession().getSessionUuid(),
+                tick.getSession().getTargetUrl(),
+                tick.getRunId(),
+                tick.getTickNumber(),
+                tick.getTickStatus(),
+                tick.getCapturedAt(),
+                tick.getActionId(),
+                tick.getActionType(),
+                tick.getActionLabel(),
+                tick.getCandidateCount(),
+                tick.getExecutionSuccess(),
+                tick.getDomChanged(),
+                tick.getNetworkEventsAdded(),
+                tick.getErrorDetected(),
+                tick.getErrorReasons(),
+                tick.getPayload()
         );
     }
 

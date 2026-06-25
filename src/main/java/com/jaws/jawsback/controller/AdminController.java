@@ -7,6 +7,8 @@ import com.jaws.jawsback.dto.AdminDto.AdminSessionDetailResponse;
 import com.jaws.jawsback.dto.AdminDto.AdminSessionItem;
 import com.jaws.jawsback.dto.AdminDto.AdminSessionsResponse;
 import com.jaws.jawsback.dto.AdminDto.AdminSummaryResponse;
+import com.jaws.jawsback.dto.AdminDto.AdminTicksResponse;
+import com.jaws.jawsback.dto.AdminDto.AdminUsersResponse;
 import com.jaws.jawsback.service.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -46,6 +49,18 @@ public class AdminController {
     @GetMapping("/log-collectors")
     public ResponseEntity<AdminLogCollectorsResponse> logCollectors() {
         return ResponseEntity.ok(adminService.logCollectors());
+    }
+
+    @GetMapping("/ticks")
+    public ResponseEntity<AdminTicksResponse> ticks(
+            @RequestParam(required = false) String sessionId
+    ) {
+        return ResponseEntity.ok(adminService.ticks(sessionId));
+    }
+
+    @GetMapping("/users")
+    public ResponseEntity<AdminUsersResponse> users() {
+        return ResponseEntity.ok(adminService.users());
     }
 
     @GetMapping("/sessions/{sessionId}")

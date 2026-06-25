@@ -11,7 +11,11 @@ public interface DetectedBugRepository extends JpaRepository<DetectedBug, Long> 
 
     List<DetectedBug> findTop20ByOrderByIdDesc();
 
+    List<DetectedBug> findAllByOrderByIdDesc();
+
     int countBySessionSessionUuid(String sessionUuid);
 
     int countBySessionId(Long sessionId);
+
+    long countBySessionUserId(Long userId);
 }

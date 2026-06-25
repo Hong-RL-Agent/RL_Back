@@ -70,6 +70,45 @@ public class AdminDto {
     public record AdminLogCollectorsResponse(List<AdminLogCollectorItem> collectors) {
     }
 
+    public record AdminTickItem(
+            Long id,
+            String sessionId,
+            String targetUrl,
+            String runId,
+            int tick,
+            String status,
+            String capturedAt,
+            String actionId,
+            String actionType,
+            String actionLabel,
+            int candidateCount,
+            Boolean executionSuccess,
+            Boolean domChanged,
+            int networkEventsAdded,
+            boolean errorDetected,
+            String errorReasons,
+            String payload
+    ) {
+    }
+
+    public record AdminTicksResponse(long total, List<AdminTickItem> ticks) {
+    }
+
+    public record AdminUserItem(
+            Long id,
+            String userName,
+            String email,
+            String role,
+            String createdAt,
+            long sessionCount,
+            long issueCount,
+            long tickCount
+    ) {
+    }
+
+    public record AdminUsersResponse(List<AdminUserItem> users) {
+    }
+
     public record AdminSessionDetailResponse(
             AdminSessionItem session,
             List<String> logs,

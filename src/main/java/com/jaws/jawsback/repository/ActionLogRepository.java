@@ -10,4 +10,6 @@ public interface ActionLogRepository extends JpaRepository<ActionLog, Long> {
     List<ActionLog> findBySessionSessionUuidOrderByCreatedAtAsc(String sessionUuid);
 
     List<ActionLog> findTop20ByOrderByCreatedAtDesc();
+
+    List<ActionLog> findAllByOrderByCreatedAtDesc();
 }
