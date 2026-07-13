@@ -66,6 +66,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -384,7 +385,7 @@ public class TestSessionService {
                 String state = status.path("status").asText();
                 if ("completed".equals(state)) {
                     HttpResponse<String> resultResponse = sendJson("GET", browserGymBaseUrl + "/explorations/" + jobId + "/result", null, 20);
-                    persistBrowserGymResult(sessionId, objectMapper.readTree(resultResponse.body()));
+                    persistBrowserGymResult(sessionId, objectMapper.readTree(resultResponse.body()), emittedBrowserGymFindings);
                     markCompleted(sessionId);
                     progressStore.put(sessionId, 100);
                     send(sessionId, "progress", StreamEvent.progress(100));
@@ -451,7 +452,7 @@ public class TestSessionService {
                 }
                 for (JsonNode anomaly : event.path("anomalies")) {
                     String anomalyType = anomaly.path("type").asText("anomaly");
-                    String fingerprint = anomalyType + ":" + anomaly.path("evidence").toString();
+                    String fingerprint = browserGymFindingFingerprint(anomaly);
                     if (!emittedFindings.add(fingerprint)) {
                         continue;
                     }
@@ -504,7 +505,7 @@ public class TestSessionService {
         }
     }
 
-    private void persistBrowserGymResult(String sessionId, JsonNode result) {
+    private void persistBrowserGymResult(String sessionId, JsonNode result, Set<String> emittedFindings) {
         JsonNode coverage = result.path("coverage");
         String coverageMessage = "coverageScore=" + coverage.path("coverage_score").asDouble(0.0)
                 + ", states=" + coverage.path("visited_states").asInt(0)
@@ -513,16 +514,35 @@ public class TestSessionService {
         saveAction(sessionId, "Coverage", null, coverageMessage);
         send(sessionId, "log", StreamEvent.log("AI", coverageMessage));
         for (JsonNode finding : result.path("findings")) {
+            String fingerprint = finding.path("fingerprint").asText("");
+            if (!fingerprint.isBlank() && !emittedFindings.add(fingerprint)) {
+                continue;
+            }
             JsonNode risk = finding.path("risk");
             int score = risk.path("score").asInt(0);
             int severity = score >= 85 ? 5 : score >= 65 ? 4 : score >= 40 ? 3 : score >= 20 ? 2 : 1;
             String type = finding.path("type").asText("ANOMALY");
             String detail = type + " | risk=" + score + " " + risk.path("level").asText()
                     + " | confidence=" + risk.path("confidence").asDouble(0.0)
-                    + " | fingerprint=" + finding.path("fingerprint").asText();
+                    + " | fingerprint=" + fingerprint;
             saveBug(sessionId, null, "BROWSERGYM_" + type.toUpperCase().replace('-', '_'), detectScope(detail), severity, detail);
             send(sessionId, "issue", StreamEvent.issue(detectIssueLabel(detail), detail, severity >= 4 ? "error" : "warning"));
         }
+    }
+
+    private String browserGymFindingFingerprint(JsonNode anomaly) {
+        JsonNode evidence = anomaly.path("evidence");
+        return String.join("|",
+                fingerprintPart(anomaly.path("type").asText("")),
+                fingerprintPart(evidence.path("before_url").asText("")),
+                fingerprintPart(evidence.path("clicked_text").asText("")),
+                fingerprintPart(evidence.path("selector").asText("")),
+                fingerprintPart(evidence.path("error").asText("")));
+    }
+
+    private String fingerprintPart(String value) {
+        String normalized = value == null ? "" : value.toLowerCase(Locale.ROOT);
+        return normalized.length() <= 160 ? normalized : normalized.substring(0, 160);
     }
 
     private HttpResponse<String> sendJson(String method, String url, String body, int timeoutSeconds) throws Exception {
