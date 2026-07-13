@@ -53,6 +53,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -95,8 +96,10 @@ public class TestSessionService {
     private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
     private final Map<String, Integer> progressStore = new ConcurrentHashMap<>();
     private final Map<String, Future<?>> runningTasks = new ConcurrentHashMap<>();
+    private final Map<String, String> browserGymJobs = new ConcurrentHashMap<>();
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private final HttpClient httpClient = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(Duration.ofSeconds(3))
             .build();
 
@@ -111,6 +114,24 @@ public class TestSessionService {
 
     @Value("${external.ai.report-url:http://localhost:8001/report}")
     private String aiReportUrl;
+
+    @Value("${external.ai.browsergym.enabled:true}")
+    private boolean browserGymEnabled;
+
+    @Value("${external.ai.browsergym.base-url:http://localhost:8080}")
+    private String browserGymBaseUrl;
+
+    @Value("${external.ai.browsergym.episodes:3}")
+    private int browserGymEpisodes;
+
+    @Value("${external.ai.browsergym.max-steps:25}")
+    private int browserGymMaxSteps;
+
+    @Value("${external.ai.browsergym.poll-interval-ms:1000}")
+    private long browserGymPollIntervalMs;
+
+    @Value("${external.ai.browsergym.timeout-seconds:900}")
+    private long browserGymTimeoutSeconds;
 
     @Transactional
     public TestStartResponse start(TestStartRequest request) {
@@ -246,6 +267,7 @@ public class TestSessionService {
         if (task != null) {
             task.cancel(true);
         }
+        stopBrowserGymJob(sessionId);
         session.markStopped();
         progressStore.put(sessionId, 0);
         send(sessionId, "status", StreamEvent.status("paused"));
@@ -295,6 +317,14 @@ public class TestSessionService {
     private void runTest(String sessionId, String targetUrl) {
         Future<?> task = executor.submit(() -> {
             try {
+                if (browserGymEnabled && runBrowserGymTest(sessionId, targetUrl)) {
+                    return;
+                }
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
+                saveAction(sessionId, "Fallback", null, "BrowserGym AI unavailable; starting legacy Playwright explorer.");
+                send(sessionId, "log", StreamEvent.log("State", "BrowserGym AI unavailable; starting legacy Playwright explorer."));
                 if (runPlaywrightTest(sessionId, targetUrl)) {
                     return;
                 }
@@ -314,6 +344,218 @@ public class TestSessionService {
             }
         });
         runningTasks.put(sessionId, task);
+    }
+
+    private boolean runBrowserGymTest(String sessionId, String targetUrl) {
+        try {
+            markRunning(sessionId);
+            publishProgress(sessionId, 2, "AI", "Creating BrowserGym PPO exploration job");
+            String createUrl = browserGymBaseUrl + "/explorations/start"
+                    + "?sessionId=" + urlEncode(sessionId)
+                    + "&targetUrl=" + urlEncode(targetUrl)
+                    + "&mode=fault-discovery"
+                    + "&episodes=" + Math.max(1, browserGymEpisodes)
+                    + "&maxSteps=" + Math.max(1, browserGymMaxSteps)
+                    + "&headless=true";
+            HttpResponse<String> created = sendJson("POST", createUrl, "{}", 15);
+            if (created.statusCode() < 200 || created.statusCode() >= 300) {
+                throw new IOException("BrowserGym create job returned " + created.statusCode()
+                        + ": " + compactResponseBody(created.body()));
+            }
+            String jobId = objectMapper.readTree(created.body()).path("jobId").asText();
+            if (jobId.isBlank()) {
+                throw new IOException("BrowserGym response did not include jobId");
+            }
+            browserGymJobs.put(sessionId, jobId);
+            saveAction(sessionId, "AI", null, "BrowserGym job=" + jobId);
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(Math.max(30, browserGymTimeoutSeconds));
+            int eventCursor = 0;
+            Set<String> emittedBrowserGymFindings = new HashSet<>();
+            while (System.nanoTime() < deadline) {
+                if (Thread.currentThread().isInterrupted()) {
+                    stopBrowserGymJob(sessionId);
+                    return false;
+                }
+                HttpResponse<String> statusResponse = sendJson("GET", browserGymBaseUrl + "/explorations/" + jobId, null, 10);
+                JsonNode status = objectMapper.readTree(statusResponse.body());
+                int progress = status.path("progress").asInt(0);
+                publishProgress(sessionId, Math.min(99, Math.max(2, progress)), "AI", "BrowserGym PPO exploration running");
+                eventCursor = consumeBrowserGymEvents(sessionId, jobId, eventCursor, emittedBrowserGymFindings);
+                String state = status.path("status").asText();
+                if ("completed".equals(state)) {
+                    HttpResponse<String> resultResponse = sendJson("GET", browserGymBaseUrl + "/explorations/" + jobId + "/result", null, 20);
+                    persistBrowserGymResult(sessionId, objectMapper.readTree(resultResponse.body()));
+                    markCompleted(sessionId);
+                    progressStore.put(sessionId, 100);
+                    send(sessionId, "progress", StreamEvent.progress(100));
+                    send(sessionId, "status", StreamEvent.status("completed"));
+                    send(sessionId, "complete", StreamEvent.complete());
+                    completeEmitter(sessionId);
+                    return true;
+                }
+                if ("failed".equals(state) || "cancelled".equals(state)) {
+                    throw new IOException("BrowserGym job " + state + ": " + status.path("error").asText("unknown error"));
+                }
+                Thread.sleep(Math.max(250, browserGymPollIntervalMs));
+            }
+            stopBrowserGymJob(sessionId);
+            throw new IOException("BrowserGym job timed out");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        } catch (Exception e) {
+            saveAction(sessionId, "AI", null, "BrowserGym integration failed: " + e.getMessage());
+            send(sessionId, "log", StreamEvent.log("Error", "BrowserGym integration failed: " + e.getMessage()));
+            return false;
+        } finally {
+            browserGymJobs.remove(sessionId);
+        }
+    }
+
+    private int consumeBrowserGymEvents(String sessionId, String jobId, int cursor,
+                                        Set<String> emittedFindings) {
+        try {
+            HttpResponse<String> response = sendJson("GET", browserGymBaseUrl + "/explorations/" + jobId + "/events?after=" + cursor, null, 10);
+            JsonNode body = objectMapper.readTree(response.body());
+            for (JsonNode event : body.path("events")) {
+                String type = event.path("type").asText("event");
+                if (!"step".equals(type)) {
+                    continue;
+                }
+                String actionType = event.path("action").asText("-");
+                String url = event.path("url").asText("");
+                boolean success = event.path("success").asBoolean(true);
+                boolean newState = event.path("new_state").asBoolean(false);
+                int candidateCount = event.path("candidate_count").asInt(0);
+                int anomalyCount = event.path("anomaly_count").asInt(0);
+                String message = "episode=" + event.path("episode").asInt(0)
+                        + ", step=" + event.path("step").asInt(0)
+                        + ", action=" + actionType
+                        + ", success=" + success
+                        + ", newState=" + newState
+                        + ", candidates=" + candidateCount
+                        + ", anomalies=" + anomalyCount
+                        + (url.isBlank() ? "" : ", url=" + url);
+                saveAction(sessionId, "Action", event.path("action_id").asText(null), message);
+                send(sessionId, "log", StreamEvent.log("Action", message));
+                send(sessionId, "log", StreamEvent.log("State",
+                        "candidates=" + candidateCount + ", newState=" + newState
+                                + ", success=" + success + (url.isBlank() ? "" : ", url=" + url)));
+
+                if ("inspect_network".equals(actionType)) {
+                    send(sessionId, "log", StreamEvent.log("Network",
+                            "Network inspection completed; anomalies=" + anomalyCount));
+                }
+                if (!success) {
+                    send(sessionId, "log", StreamEvent.log("Error", "Action failed: " + actionType));
+                }
+                for (JsonNode anomaly : event.path("anomalies")) {
+                    String anomalyType = anomaly.path("type").asText("anomaly");
+                    String fingerprint = anomalyType + ":" + anomaly.path("evidence").toString();
+                    if (!emittedFindings.add(fingerprint)) {
+                        continue;
+                    }
+                    double confidence = anomaly.path("confidence").asDouble(0.0);
+                    String detail = anomalyType + " | confidence=" + confidence
+                            + " | evidence=" + compactResponseBody(anomaly.path("evidence").toString());
+                    int severity = confidence >= 0.8 ? 4 : confidence >= 0.6 ? 3 : 2;
+                    saveBug(sessionId, null, "BROWSERGYM_" + anomalyType.toUpperCase().replace('-', '_'),
+                            detectScope(detail), severity, detail);
+                    send(sessionId, "issue", StreamEvent.issue(detectIssueLabel(detail), detail,
+                            severity >= 4 ? "error" : "warning"));
+                }
+
+                String screenshotFile = event.path("screenshot_file").asText("");
+                if (!screenshotFile.isBlank() && downloadBrowserGymScreenshot(sessionId, jobId, screenshotFile)) {
+                    send(sessionId, "log", StreamEvent.log("Preview",
+                            "/api/test/" + sessionId + "/screenshots/" + screenshotFile));
+                }
+            }
+            return body.path("next").asInt(cursor);
+        } catch (Exception ignored) {
+            return cursor;
+        }
+    }
+
+    private boolean downloadBrowserGymScreenshot(String sessionId, String jobId, String fileName) {
+        if (fileName.contains("/") || fileName.contains("\\")) {
+            return false;
+        }
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(browserGymBaseUrl
+                            + "/explorations/" + jobId + "/screenshots/" + urlEncode(fileName)))
+                    .timeout(Duration.ofSeconds(10))
+                    .GET()
+                    .build();
+            HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                return false;
+            }
+            Path directory = captureDirectory(sessionId);
+            Files.createDirectories(directory);
+            Path target = directory.resolve(fileName).normalize();
+            if (!target.startsWith(directory)) {
+                return false;
+            }
+            Files.write(target, response.body());
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private void persistBrowserGymResult(String sessionId, JsonNode result) {
+        JsonNode coverage = result.path("coverage");
+        String coverageMessage = "coverageScore=" + coverage.path("coverage_score").asDouble(0.0)
+                + ", states=" + coverage.path("visited_states").asInt(0)
+                + ", actions=" + coverage.path("visited_actions").asInt(0)
+                + ", transitions=" + coverage.path("visited_transitions").asInt(0);
+        saveAction(sessionId, "Coverage", null, coverageMessage);
+        send(sessionId, "log", StreamEvent.log("AI", coverageMessage));
+        for (JsonNode finding : result.path("findings")) {
+            JsonNode risk = finding.path("risk");
+            int score = risk.path("score").asInt(0);
+            int severity = score >= 85 ? 5 : score >= 65 ? 4 : score >= 40 ? 3 : score >= 20 ? 2 : 1;
+            String type = finding.path("type").asText("ANOMALY");
+            String detail = type + " | risk=" + score + " " + risk.path("level").asText()
+                    + " | confidence=" + risk.path("confidence").asDouble(0.0)
+                    + " | fingerprint=" + finding.path("fingerprint").asText();
+            saveBug(sessionId, null, "BROWSERGYM_" + type.toUpperCase().replace('-', '_'), detectScope(detail), severity, detail);
+            send(sessionId, "issue", StreamEvent.issue(detectIssueLabel(detail), detail, severity >= 4 ? "error" : "warning"));
+        }
+    }
+
+    private HttpResponse<String> sendJson(String method, String url, String body, int timeoutSeconds) throws Exception {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(timeoutSeconds));
+        if (body == null) {
+            builder.GET();
+        } else {
+            builder.header("Content-Type", "application/json").method(method, HttpRequest.BodyPublishers.ofString(body));
+        }
+        return httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private String compactResponseBody(String body) {
+        if (body == null || body.isBlank()) {
+            return "empty response";
+        }
+        String compact = body.replaceAll("\\s+", " ").strip();
+        return compact.length() <= 500 ? compact : compact.substring(0, 500) + "...";
+    }
+
+    private String urlEncode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private void stopBrowserGymJob(String sessionId) {
+        String jobId = browserGymJobs.remove(sessionId);
+        if (jobId == null) {
+            return;
+        }
+        try {
+            sendJson("POST", browserGymBaseUrl + "/explorations/" + jobId + "/stop", "{}", 5);
+        } catch (Exception ignored) {
+        }
     }
 
     private boolean runPlaywrightTest(String sessionId, String targetUrl) {
