@@ -178,16 +178,38 @@ public class AdminService {
     }
 
     private AdminIssueItem toIssueItem(DetectedBug bug) {
-        String severity = bug.getSeverity() != null && bug.getSeverity() >= 4 ? "Critical" : "Warning";
+        String severity = severityLabel(bug.getSeverity(), bug.getRiskAssessmentStatus());
         return new AdminIssueItem(
                 bug.getId(),
                 severity,
+                bug.getRiskScore(),
+                bug.getRiskConfidence(),
+                bug.getRiskImpact(),
+                bug.getRiskLikelihood(),
+                bug.getRiskAssessmentStatus(),
+                bug.getRiskComponentScores(),
                 nullToDash(bug.getErrorMessage()),
                 bug.getSession().getSessionUuid(),
                 bug.getSession().getTargetUrl(),
                 bug.getAction() == null ? "-" : formatTime(bug.getAction().getCreatedAt()),
                 "Detected"
         );
+    }
+
+    private String severityLabel(Integer severity, String assessmentStatus) {
+        if ("SECURITY_EXCLUDED".equals(assessmentStatus) || "NOT_OBSERVABLE".equals(assessmentStatus)) {
+            return "Not Assessed";
+        }
+        if (severity == null) {
+            return "Informational";
+        }
+        return switch (severity) {
+            case 5 -> "Critical";
+            case 4 -> "High";
+            case 3 -> "Medium";
+            case 2 -> "Low";
+            default -> "Informational";
+        };
     }
 
     private AdminTickItem toTickItem(TickLog tick) {

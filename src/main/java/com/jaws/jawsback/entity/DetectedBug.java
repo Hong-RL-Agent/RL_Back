@@ -47,6 +47,25 @@ public class DetectedBug {
     @Column(name = "severity")
     private Integer severity;
 
+    @Column(name = "risk_score")
+    private Integer riskScore;
+
+    @Column(name = "risk_confidence")
+    private Double riskConfidence;
+
+    @Column(name = "risk_impact")
+    private Double riskImpact;
+
+    @Column(name = "risk_likelihood")
+    private Double riskLikelihood;
+
+    @Column(name = "risk_assessment_status", length = 32)
+    private String riskAssessmentStatus;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "risk_component_scores", columnDefinition = "jsonb")
+    private String riskComponentScores;
+
     @Column(name = "error_message", nullable = false, columnDefinition = "text")
     private String errorMessage;
 
@@ -62,13 +81,21 @@ public class DetectedBug {
 
     @Builder
     public DetectedBug(TestSession session, ActionLog action, String categoryCode, ErrorScopeType errorScope,
-                       Integer severity, String errorMessage, String stackTrace, Boolean embedded,
+                       Integer severity, Integer riskScore, Double riskConfidence, Double riskImpact,
+                       Double riskLikelihood, String riskAssessmentStatus, String riskComponentScores,
+                       String errorMessage, String stackTrace, Boolean embedded,
                        String embeddedVectorMetadata) {
         this.session = session;
         this.action = action;
         this.categoryCode = categoryCode;
         this.errorScope = errorScope;
         this.severity = severity;
+        this.riskScore = riskScore;
+        this.riskConfidence = riskConfidence;
+        this.riskImpact = riskImpact;
+        this.riskLikelihood = riskLikelihood;
+        this.riskAssessmentStatus = riskAssessmentStatus;
+        this.riskComponentScores = riskComponentScores;
         this.errorMessage = errorMessage;
         this.stackTrace = stackTrace;
         this.embedded = embedded == null ? false : embedded;

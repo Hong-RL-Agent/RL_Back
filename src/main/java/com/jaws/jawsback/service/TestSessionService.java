@@ -22,6 +22,12 @@ import com.jaws.jawsback.dto.TestDto.TestProgressResponse;
 import com.jaws.jawsback.dto.TestDto.TestReportResponse;
 import com.jaws.jawsback.dto.TestDto.TestStartRequest;
 import com.jaws.jawsback.dto.TestDto.TestStartResponse;
+import com.jaws.jawsback.dto.TestDto.TestTickItem;
+import com.jaws.jawsback.dto.TestDto.TestTicksResponse;
+import com.jaws.jawsback.dto.TestDto.TestGraphEdge;
+import com.jaws.jawsback.dto.TestDto.TestGraphMetrics;
+import com.jaws.jawsback.dto.TestDto.TestGraphNode;
+import com.jaws.jawsback.dto.TestDto.TestGraphResponse;
 import com.jaws.jawsback.entity.ActionLog;
 import com.jaws.jawsback.entity.DetectedBug;
 import com.jaws.jawsback.entity.ErrorScopeType;
@@ -61,10 +67,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -229,6 +241,231 @@ public class TestSessionService {
         return new TestIssuesResponse(sessionId, issues);
     }
 
+    @Transactional(readOnly = true)
+    public TestTicksResponse ticks(String sessionId) {
+        ensureSession(sessionId);
+        List<TestTickItem> ticks = tickLogRepository
+                .findBySessionSessionUuidOrderByTickNumberDesc(sessionId)
+                .stream()
+                .map(tick -> new TestTickItem(
+                        tick.getId(), tick.getRunId(), tick.getTickNumber(), tick.getTickStatus(),
+                        tick.getCapturedAt(), tick.getActionId(), tick.getActionType(), tick.getActionLabel(),
+                        tick.getCandidateCount(), tick.getExecutionSuccess(), tick.getDomChanged(),
+                        tick.getNetworkEventsAdded(), tick.getErrorDetected(), tick.getErrorReasons(),
+                        tick.getPayload()
+                ))
+                .toList();
+        return new TestTicksResponse(sessionId, ticks.size(), ticks);
+    }
+
+    @Transactional(readOnly = true)
+    public TestGraphResponse graph(String sessionId, String requestedRunId) {
+        ensureSession(sessionId);
+        List<TickLog> allTicks = tickLogRepository.findBySessionSessionUuidOrderByTickNumberDesc(sessionId);
+        List<String> availableRuns = allTicks.stream()
+                .map(TickLog::getRunId)
+                .filter(value -> value != null && !value.isBlank())
+                .distinct()
+                .toList();
+        String runId = requestedRunId == null || requestedRunId.isBlank()
+                ? availableRuns.stream().findFirst().orElse("")
+                : requestedRunId;
+        List<TickLog> runTicks = allTicks.stream()
+                .filter(tick -> runId.equals(tick.getRunId()))
+                .sorted(Comparator.comparingInt(TickLog::getTickNumber))
+                .toList();
+
+        Map<String, MutableGraphNode> nodes = new LinkedHashMap<>();
+        List<TestGraphEdge> edges = new ArrayList<>();
+        int findings = 0;
+        int selfLoops = 0;
+        int failedActions = 0;
+        String previousAfterId = null;
+        for (TickLog tick : runTicks) {
+            JsonNode payload = readTickPayload(tick.getPayload());
+            GraphState before = graphState(payload.path("before"), tick.getSession().getTargetUrl(), "Before");
+            GraphState after = graphState(payload.path("after"), before.url(), "After");
+            MutableGraphNode beforeNode = nodes.computeIfAbsent(before.id(), ignored -> new MutableGraphNode(before, tick.getTickNumber()));
+            MutableGraphNode afterNode = nodes.computeIfAbsent(after.id(), ignored -> new MutableGraphNode(after, tick.getTickNumber()));
+            if (previousAfterId == null || !previousAfterId.equals(before.id())) {
+                beforeNode.visit(tick.getTickNumber(), false);
+            }
+            afterNode.visit(tick.getTickNumber(), tick.getErrorDetected());
+            previousAfterId = after.id();
+            JsonNode action = payload.path("action");
+            String actionId = firstNonBlank(textValue(action, "actionId", null), tick.getActionId());
+            String actionType = firstNonBlank(textValue(action, "type", null), tick.getActionType());
+            String actionLabel = firstNonBlank(textValue(action, "label", null), tick.getActionLabel(), actionType, "Observe");
+            boolean selfLoop = before.id().equals(after.id());
+            if (selfLoop) selfLoops++;
+            if (tick.getErrorDetected()) findings++;
+            if (Boolean.FALSE.equals(tick.getExecutionSuccess())) failedActions++;
+            edges.add(new TestGraphEdge(
+                    stableHash("edge|" + runId + "|" + tick.getId() + "|" + before.id() + "|" + after.id()),
+                    before.id(), after.id(), tick.getTickNumber(), actionId, actionType, actionLabel,
+                    tick.getExecutionSuccess(), tick.getDomChanged(), tick.getNetworkEventsAdded(),
+                    tick.getErrorDetected(), tick.getErrorReasons(), tick.getCapturedAt(), selfLoop
+            ));
+        }
+        GraphValidation validation = enrichGraphStructure(nodes, edges);
+        List<TestGraphNode> graphNodes = nodes.values().stream().map(MutableGraphNode::toDto).toList();
+        int revisited = (int) graphNodes.stream().filter(node -> node.visitCount() > 1).count();
+        TestGraphMetrics metrics = new TestGraphMetrics(
+                graphNodes.size(), edges.size(), findings, revisited, selfLoops, failedActions,
+                validation.components(), validation.orphanStates(), validation.danglingEdges()
+        );
+        return new TestGraphResponse(sessionId, runId, availableRuns, graphNodes, edges, metrics);
+    }
+
+    private JsonNode readTickPayload(String payload) {
+        try {
+            return objectMapper.readTree(payload == null ? "{}" : payload);
+        } catch (JsonProcessingException ignored) {
+            return objectMapper.createObjectNode();
+        }
+    }
+
+    private GraphState graphState(JsonNode state, String fallbackUrl, String fallbackTitle) {
+        String url = firstNonBlank(textValue(state, "url", null), fallbackUrl, "-");
+        String title = firstNonBlank(textValue(state, "title", null), fallbackTitle);
+        int viewportWidth = state.path("viewportWidth").asInt(0);
+        String viewport = viewportWidth > 0 ? viewportWidth + "px" : "default";
+        String signature = firstNonBlank(textValue(state, "signature", null), textValue(state, "stateId", null), title);
+        String id = stableHash("state|" + normalizeGraphUrl(url) + "|" + viewport + "|" + signature);
+        return new GraphState(id, title, url, viewport);
+    }
+
+    private String normalizeGraphUrl(String url) {
+        int fragment = url.indexOf('#');
+        return (fragment >= 0 ? url.substring(0, fragment) : url).trim().toLowerCase(Locale.ROOT);
+    }
+
+    private GraphValidation enrichGraphStructure(Map<String, MutableGraphNode> nodes, List<TestGraphEdge> edges) {
+        if (nodes.isEmpty()) return new GraphValidation(0, 0, 0);
+        Map<String, List<String>> undirected = new LinkedHashMap<>();
+        Map<String, List<String>> directed = new LinkedHashMap<>();
+        nodes.keySet().forEach(id -> {
+            undirected.put(id, new ArrayList<>());
+            directed.put(id, new ArrayList<>());
+        });
+        int danglingEdges = 0;
+        for (TestGraphEdge edge : edges) {
+            if (!nodes.containsKey(edge.from()) || !nodes.containsKey(edge.to())) {
+                danglingEdges++;
+                continue;
+            }
+            if (!edge.selfLoop()) {
+                undirected.get(edge.from()).add(edge.to());
+                undirected.get(edge.to()).add(edge.from());
+                directed.get(edge.from()).add(edge.to());
+            }
+        }
+
+        String rootId = nodes.entrySet().stream()
+                .min(Comparator.comparingInt(entry -> entry.getValue().firstTick))
+                .map(Map.Entry::getKey).orElse("");
+        Set<String> rootComponent = new HashSet<>();
+        int componentId = 0;
+        for (String start : nodes.keySet()) {
+            if (nodes.get(start).componentId >= 0) continue;
+            List<String> queue = new ArrayList<>();
+            queue.add(start);
+            nodes.get(start).componentId = componentId;
+            for (int index = 0; index < queue.size(); index++) {
+                String current = queue.get(index);
+                if (start.equals(rootId) || rootComponent.contains(start)) rootComponent.add(current);
+                for (String neighbor : undirected.get(current)) {
+                    if (nodes.get(neighbor).componentId < 0) {
+                        nodes.get(neighbor).componentId = componentId;
+                        queue.add(neighbor);
+                    }
+                }
+            }
+            if (queue.contains(rootId)) rootComponent.addAll(queue);
+            componentId++;
+        }
+
+        if (!rootId.isBlank()) {
+            List<String> queue = new ArrayList<>();
+            queue.add(rootId);
+            nodes.get(rootId).depth = 0;
+            for (int index = 0; index < queue.size(); index++) {
+                String current = queue.get(index);
+                for (String next : directed.get(current)) {
+                    if (nodes.get(next).depth < 0) {
+                        nodes.get(next).depth = nodes.get(current).depth + 1;
+                        queue.add(next);
+                    }
+                }
+            }
+        }
+        int orphanStates = 0;
+        for (Map.Entry<String, MutableGraphNode> entry : nodes.entrySet()) {
+            MutableGraphNode node = entry.getValue();
+            node.orphan = !rootComponent.contains(entry.getKey()) || node.depth < 0;
+            if (node.orphan) {
+                orphanStates++;
+                node.orphanReason = rootComponent.contains(entry.getKey())
+                        ? "시작 상태에서 이 상태로 향하는 전이가 누락되었습니다."
+                        : "시작 경로와 분리된 연결 요소입니다. run 혼합 또는 누락 Tick을 확인하세요.";
+            }
+        }
+        return new GraphValidation(componentId, orphanStates, danglingEdges);
+    }
+
+    private String stableHash(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest, 0, 10);
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("SHA-256 is not available", impossible);
+        }
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value;
+        }
+        return "";
+    }
+
+    private record GraphState(String id, String title, String url, String viewport) {
+    }
+
+    private record GraphValidation(int components, int orphanStates, int danglingEdges) {
+    }
+
+    private static final class MutableGraphNode {
+        private final GraphState state;
+        private int firstTick;
+        private int lastTick;
+        private int visitCount;
+        private int findingCount;
+        private int componentId = -1;
+        private int depth = -1;
+        private boolean orphan;
+        private String orphanReason = "";
+
+        private MutableGraphNode(GraphState state, int tick) {
+            this.state = state;
+            this.firstTick = tick;
+            this.lastTick = tick;
+        }
+
+        private void visit(int tick, boolean finding) {
+            firstTick = Math.min(firstTick, tick);
+            lastTick = Math.max(lastTick, tick);
+            visitCount++;
+            if (finding) findingCount++;
+        }
+
+        private TestGraphNode toDto() {
+            return new TestGraphNode(state.id(), state.title(), state.url(), state.viewport(),
+                    firstTick, lastTick, visitCount, findingCount,
+                    componentId, depth, orphan, orphanReason);
+        }
+    }
+
     @Transactional
     public TestHistoryResponse history() {
         User user = resolveCurrentUser();
@@ -350,7 +587,7 @@ public class TestSessionService {
     private boolean runBrowserGymTest(String sessionId, String targetUrl) {
         try {
             markRunning(sessionId);
-            publishProgress(sessionId, 2, "AI", "Creating BrowserGym PPO exploration job");
+            publishProgress(sessionId, 2, "AI", "BrowserGym 탐색 작업을 생성하고 있습니다.");
             String createUrl = browserGymBaseUrl + "/explorations/start"
                     + "?sessionId=" + urlEncode(sessionId)
                     + "&targetUrl=" + urlEncode(targetUrl)
@@ -380,7 +617,7 @@ public class TestSessionService {
                 HttpResponse<String> statusResponse = sendJson("GET", browserGymBaseUrl + "/explorations/" + jobId, null, 10);
                 JsonNode status = objectMapper.readTree(statusResponse.body());
                 int progress = status.path("progress").asInt(0);
-                publishProgress(sessionId, Math.min(99, Math.max(2, progress)), "AI", "BrowserGym PPO exploration running");
+                publishProgress(sessionId, Math.min(99, Math.max(2, progress)), "AI", "BrowserGym 정책으로 자동 탐색 중입니다.");
                 eventCursor = consumeBrowserGymEvents(sessionId, jobId, eventCursor, emittedBrowserGymFindings);
                 String state = status.path("status").asText();
                 if ("completed".equals(state)) {
@@ -429,26 +666,29 @@ public class TestSessionService {
                 boolean newState = event.path("new_state").asBoolean(false);
                 int candidateCount = event.path("candidate_count").asInt(0);
                 int anomalyCount = event.path("anomaly_count").asInt(0);
-                String message = "episode=" + event.path("episode").asInt(0)
-                        + ", step=" + event.path("step").asInt(0)
-                        + ", action=" + actionType
-                        + ", success=" + success
-                        + ", newState=" + newState
-                        + ", candidates=" + candidateCount
-                        + ", anomalies=" + anomalyCount
-                        + (url.isBlank() ? "" : ", url=" + url);
+                int episode = event.path("episode").asInt(0);
+                int step = event.path("step").asInt(0);
+                String cleanUrl = sanitizeBrowserUrl(url);
+                String message = "에피소드 " + episode + " · Tick " + step + " · "
+                        + describeBrowserAction(actionType) + " · "
+                        + (success ? "성공" : "실패") + " · "
+                        + (newState ? "새 화면/상태 발견" : "기존 상태 유지")
+                        + " · 실행 후보 " + candidateCount + "개"
+                        + (anomalyCount > 0 ? " · 문제 " + anomalyCount + "건" : "")
+                        + (cleanUrl.isBlank() ? "" : " · " + cleanUrl);
                 saveAction(sessionId, "Action", event.path("action_id").asText(null), message);
                 send(sessionId, "log", StreamEvent.log("Action", message));
-                send(sessionId, "log", StreamEvent.log("State",
-                        "candidates=" + candidateCount + ", newState=" + newState
-                                + ", success=" + success + (url.isBlank() ? "" : ", url=" + url)));
+                saveBrowserGymTick(sessionId, event, episode, step, actionType, cleanUrl,
+                        success, newState, candidateCount, anomalyCount);
 
                 if ("inspect_network".equals(actionType)) {
-                    send(sessionId, "log", StreamEvent.log("Network",
-                            "Network inspection completed; anomalies=" + anomalyCount));
+                    send(sessionId, "log", StreamEvent.log("AI",
+                            anomalyCount == 0 ? "네트워크 점검 완료 · 새로운 문제 없음"
+                                    : "네트워크 점검 완료 · 문제 " + anomalyCount + "건 확인"));
                 }
                 if (!success) {
-                    send(sessionId, "log", StreamEvent.log("Error", "Action failed: " + actionType));
+                    send(sessionId, "log", StreamEvent.log("Error",
+                            "Tick " + step + "에서 " + describeBrowserAction(actionType) + " 동작이 실패했습니다."));
                 }
                 for (JsonNode anomaly : event.path("anomalies")) {
                     String anomalyType = anomaly.path("type").asText("anomaly");
@@ -476,6 +716,66 @@ public class TestSessionService {
         } catch (Exception ignored) {
             return cursor;
         }
+    }
+
+    private String describeBrowserAction(String actionType) {
+        return switch (actionType) {
+            case "inspect_layout" -> "화면 배치 점검";
+            case "fill_input" -> "입력란 작성";
+            case "change_viewport_mobile" -> "모바일 화면 전환";
+            case "change_viewport_desktop" -> "데스크톱 화면 전환";
+            case "inspect_console" -> "브라우저 오류 점검";
+            case "inspect_network" -> "네트워크 점검";
+            case "click_element" -> "화면 요소 클릭";
+            case "navigate" -> "페이지 이동";
+            case "submit_form" -> "양식 제출";
+            default -> actionType.replace('_', ' ');
+        };
+    }
+
+    private String sanitizeBrowserUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return "";
+        }
+        return url.replaceFirst(";jsessionid=[^?&#]*", "");
+    }
+
+    private void saveBrowserGymTick(String sessionId, JsonNode event, int episode, int step,
+                                    String actionType, String cleanUrl, boolean success,
+                                    boolean newState, int candidateCount, int anomalyCount) {
+        var payload = objectMapper.createObjectNode();
+        payload.put("runId", "browsergym-episode-" + episode);
+        payload.put("tick", step);
+        payload.put("status", success ? "executed" : "failed");
+        payload.put("capturedAt", event.path("timestamp").asText(LocalDateTime.now().toString()));
+        payload.put("actionOptionCount", candidateCount);
+        payload.put("networkEventsAdded", "inspect_network".equals(actionType) ? anomalyCount : 0);
+        payload.put("error", anomalyCount > 0 || !success);
+        List<String> reasons = new ArrayList<>();
+        for (JsonNode anomaly : event.path("anomalies")) {
+            reasons.add(anomaly.path("type").asText("anomaly"));
+        }
+        if (!success) reasons.add("action-failed");
+        payload.put("errorReasons", String.join(", ", reasons));
+
+        var before = payload.putObject("before");
+        before.put("url", sanitizeBrowserUrl(event.path("url_before").asText(cleanUrl)));
+        before.put("title", "Tick " + step + " 이전 상태");
+        before.put("stateId", event.path("state_id_before").asText("before-" + episode + "-" + step));
+        before.put("viewportWidth", event.path("viewport_width_before").asInt(0));
+        var after = payload.putObject("after");
+        after.put("url", sanitizeBrowserUrl(event.path("url_after").asText(cleanUrl)));
+        after.put("title", newState ? "새 상태" : "기존 상태");
+        after.put("stateId", event.path("state_id_after").asText("after-" + episode + "-" + step));
+        after.put("viewportWidth", event.path("viewport_width_after").asInt(0));
+        var action = payload.putObject("action");
+        action.put("actionId", event.path("action_id").asText(""));
+        action.put("type", actionType);
+        action.put("label", describeBrowserAction(actionType));
+        var result = payload.putObject("result");
+        result.put("success", success);
+        result.put("domChanged", newState);
+        saveTick(sessionId, payload.toString());
     }
 
     private boolean downloadBrowserGymScreenshot(String sessionId, String jobId, String fileName) {
@@ -519,14 +819,21 @@ public class TestSessionService {
                 continue;
             }
             JsonNode risk = finding.path("risk");
-            int score = risk.path("score").asInt(0);
-            int severity = score >= 85 ? 5 : score >= 65 ? 4 : score >= 40 ? 3 : score >= 20 ? 2 : 1;
+            Integer score = risk.path("score").isNumber() ? risk.path("score").asInt() : null;
+            Integer severity = score == null ? null
+                    : score >= 85 ? 5 : score >= 65 ? 4 : score >= 40 ? 3 : score >= 20 ? 2 : 1;
+            String assessmentStatus = risk.path("assessment_status").asText("NEEDS_REVIEW");
             String type = finding.path("type").asText("ANOMALY");
-            String detail = type + " | risk=" + score + " " + risk.path("level").asText()
+            String detail = type + " | risk=" + (score == null ? "not-assessed" : score) + " " + risk.path("level").asText()
                     + " | confidence=" + risk.path("confidence").asDouble(0.0)
+                    + " | status=" + assessmentStatus
                     + " | fingerprint=" + fingerprint;
-            saveBug(sessionId, null, "BROWSERGYM_" + type.toUpperCase().replace('-', '_'), detectScope(detail), severity, detail);
-            send(sessionId, "issue", StreamEvent.issue(detectIssueLabel(detail), detail, severity >= 4 ? "error" : "warning"));
+            saveBug(sessionId, null, "BROWSERGYM_" + type.toUpperCase().replace('-', '_'), detectScope(detail),
+                    severity, score, risk.path("confidence").asDouble(0.0),
+                    null, null, assessmentStatus,
+                    risk.path("component_scores").isObject() ? risk.path("component_scores").toString() : null, detail);
+            send(sessionId, "issue", StreamEvent.issue(detectIssueLabel(detail), detail,
+                    severity != null && severity >= 4 ? "error" : "warning"));
         }
     }
 
@@ -1060,6 +1367,14 @@ public class TestSessionService {
 
     private void saveBug(String sessionId, Long actionId, String categoryCode, ErrorScopeType scope,
                          int severity, String message) {
+        saveBug(sessionId, actionId, categoryCode, scope, severity, null, null, null, null,
+                null, null, message);
+    }
+
+    private void saveBug(String sessionId, Long actionId, String categoryCode, ErrorScopeType scope,
+                         Integer severity, Integer riskScore, Double riskConfidence, Double riskImpact,
+                         Double riskLikelihood, String riskAssessmentStatus, String riskComponentScores,
+                         String message) {
         transactionTemplate.executeWithoutResult(status -> {
             TestSession session = findSession(sessionId);
             ActionLog action = actionId == null ? null : actionLogRepository.findById(actionId).orElse(null);
@@ -1069,6 +1384,12 @@ public class TestSessionService {
                     .categoryCode(categoryCode)
                     .errorScope(scope)
                     .severity(severity)
+                    .riskScore(riskScore)
+                    .riskConfidence(riskConfidence)
+                    .riskImpact(riskImpact)
+                    .riskLikelihood(riskLikelihood)
+                    .riskAssessmentStatus(riskAssessmentStatus)
+                    .riskComponentScores(riskComponentScores)
                     .errorMessage(message)
                     .embedded(false)
                     .build());

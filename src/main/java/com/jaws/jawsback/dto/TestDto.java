@@ -39,6 +39,89 @@ public class TestDto {
     ) {
     }
 
+    public record TestTickItem(
+            Long id,
+            String runId,
+            int tick,
+            String status,
+            String capturedAt,
+            String actionId,
+            String actionType,
+            String actionLabel,
+            int candidateCount,
+            Boolean executionSuccess,
+            Boolean domChanged,
+            int networkEventsAdded,
+            boolean errorDetected,
+            String errorReasons,
+            String payload
+    ) {
+    }
+
+    public record TestTicksResponse(
+            String sessionId,
+            long total,
+            List<TestTickItem> ticks
+    ) {
+    }
+
+    public record TestGraphNode(
+            String id,
+            String title,
+            String url,
+            String viewport,
+            int firstTick,
+            int lastTick,
+            int visitCount,
+            int findingCount,
+            int componentId,
+            int depth,
+            boolean orphan,
+            String orphanReason
+    ) {
+    }
+
+    public record TestGraphEdge(
+            String id,
+            String from,
+            String to,
+            int tick,
+            String actionId,
+            String actionType,
+            String actionLabel,
+            Boolean executionSuccess,
+            Boolean domChanged,
+            int networkEventsAdded,
+            boolean finding,
+            String findingReasons,
+            String capturedAt,
+            boolean selfLoop
+    ) {
+    }
+
+    public record TestGraphMetrics(
+            int uniqueStates,
+            int transitions,
+            int findings,
+            int revisitedStates,
+            int selfLoops,
+            int failedActions,
+            int components,
+            int orphanStates,
+            int danglingEdges
+    ) {
+    }
+
+    public record TestGraphResponse(
+            String sessionId,
+            String runId,
+            List<String> availableRuns,
+            List<TestGraphNode> nodes,
+            List<TestGraphEdge> edges,
+            TestGraphMetrics metrics
+    ) {
+    }
+
     public record TestReportResponse(
             String sessionId,
             String reportUrl

@@ -7,6 +7,8 @@ import com.jaws.jawsback.dto.TestDto.TestProgressResponse;
 import com.jaws.jawsback.dto.TestDto.TestReportResponse;
 import com.jaws.jawsback.dto.TestDto.TestStartRequest;
 import com.jaws.jawsback.dto.TestDto.TestStartResponse;
+import com.jaws.jawsback.dto.TestDto.TestTicksResponse;
+import com.jaws.jawsback.dto.TestDto.TestGraphResponse;
 import com.jaws.jawsback.service.TestSessionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -56,6 +59,19 @@ public class TestController {
     @GetMapping("/{sessionId}/issues")
     public ResponseEntity<TestIssuesResponse> issues(@PathVariable String sessionId) {
         return ResponseEntity.ok(testSessionService.issues(sessionId));
+    }
+
+    @GetMapping("/{sessionId}/ticks")
+    public ResponseEntity<TestTicksResponse> ticks(@PathVariable String sessionId) {
+        return ResponseEntity.ok(testSessionService.ticks(sessionId));
+    }
+
+    @GetMapping("/{sessionId}/graph")
+    public ResponseEntity<TestGraphResponse> graph(
+            @PathVariable String sessionId,
+            @RequestParam(required = false) String runId
+    ) {
+        return ResponseEntity.ok(testSessionService.graph(sessionId, runId));
     }
 
     @GetMapping("/history")

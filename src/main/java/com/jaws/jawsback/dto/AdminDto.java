@@ -47,6 +47,12 @@ public class AdminDto {
     public record AdminIssueItem(
             Long id,
             String severity,
+            Integer riskScore,
+            Double confidence,
+            Double impact,
+            Double likelihood,
+            String assessmentStatus,
+            String componentScores,
             String title,
             String sessionId,
             String target,
