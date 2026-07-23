@@ -708,8 +708,14 @@ public class TestSessionService {
 
                 String screenshotFile = event.path("screenshot_file").asText("");
                 if (!screenshotFile.isBlank() && downloadBrowserGymScreenshot(sessionId, jobId, screenshotFile)) {
+                    String previewQuery = "?v=" + System.currentTimeMillis()
+                            + "&width=" + event.path("screenshot_width").asInt(0)
+                            + "&height=" + event.path("screenshot_height").asInt(0)
+                            + "&viewportWidth=" + event.path("viewport_width_after").asInt(0)
+                            + "&viewportHeight=" + event.path("viewport_height_after").asInt(0)
+                            + "&mode=" + urlEncode(event.path("capture_mode").asText("viewport"));
                     send(sessionId, "log", StreamEvent.log("Preview",
-                            "/api/test/" + sessionId + "/screenshots/" + screenshotFile));
+                            "/api/test/" + sessionId + "/screenshots/" + screenshotFile + previewQuery));
                 }
             }
             return body.path("next").asInt(cursor);
