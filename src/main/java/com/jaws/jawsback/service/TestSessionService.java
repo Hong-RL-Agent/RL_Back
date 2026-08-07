@@ -3,16 +3,6 @@ package com.jaws.jawsback.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.example.demo.agent.PlaywrightExecutor;
-import com.example.demo.graph.StateGraph;
-import com.example.demo.model.ActionCandidate;
-import com.example.demo.model.ActionExecutionResult;
-import com.example.demo.model.EncodedState;
-import com.example.demo.observer.ActionExtractor;
-import com.example.demo.observer.StateEncoder;
-import com.example.demo.oracle.BugOracle;
-import com.example.demo.policy.RuleBasedPolicy;
-import com.microsoft.playwright.Page;
 import com.jaws.jawsback.dto.TestDto.StreamEvent;
 import com.jaws.jawsback.dto.TestDto.TestHistoryItem;
 import com.jaws.jawsback.dto.TestDto.TestHistoryResponse;
@@ -33,6 +23,7 @@ import com.jaws.jawsback.entity.DetectedBug;
 import com.jaws.jawsback.entity.ErrorScopeType;
 import com.jaws.jawsback.entity.PdfReport;
 import com.jaws.jawsback.entity.SessionStatus;
+import com.jaws.jawsback.entity.StaticIssue;
 import com.jaws.jawsback.entity.TestSession;
 import com.jaws.jawsback.entity.TickLog;
 import com.jaws.jawsback.entity.User;
@@ -40,6 +31,7 @@ import com.jaws.jawsback.exception.ResourceNotFoundException;
 import com.jaws.jawsback.repository.ActionLogRepository;
 import com.jaws.jawsback.repository.DetectedBugRepository;
 import com.jaws.jawsback.repository.PdfReportRepository;
+import com.jaws.jawsback.repository.StaticIssueRepository;
 import com.jaws.jawsback.repository.TestSessionRepository;
 import com.jaws.jawsback.repository.TickLogRepository;
 import com.jaws.jawsback.repository.UserRepository;
@@ -82,6 +74,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.ExecutorService;
@@ -102,6 +95,7 @@ public class TestSessionService {
     private final ActionLogRepository actionLogRepository;
     private final DetectedBugRepository detectedBugRepository;
     private final PdfReportRepository pdfReportRepository;
+    private final StaticIssueRepository staticIssueRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
@@ -145,6 +139,21 @@ public class TestSessionService {
 
     @Value("${external.ai.browsergym.timeout-seconds:900}")
     private long browserGymTimeoutSeconds;
+
+    @Value("${external.static-analysis.enabled:true}")
+    private boolean staticAnalysisEnabled;
+
+    @Value("${external.static-analysis.server-url:http://localhost:8092/api/static-analysis}")
+    private String staticAnalysisServerUrl;
+
+    @Value("${external.static-analysis.node-command:node}")
+    private String staticAnalysisNodeCommand;
+
+    @Value("${external.static-analysis.cli-script:../static-analysis/cli.js}")
+    private String staticAnalysisCliScript;
+
+    @Value("${external.static-analysis.url-source-map:}")
+    private String staticAnalysisUrlSourceMap;
 
     @Transactional
     public TestStartResponse start(TestStartRequest request) {
@@ -213,6 +222,7 @@ public class TestSessionService {
         String currentStatus = session.getStatus().name().toLowerCase();
         send(sessionId, "status", StreamEvent.status(currentStatus));
         send(sessionId, "progress", StreamEvent.progress(progressStore.getOrDefault(sessionId, 0)));
+        replayStoredEvents(sessionId);
         return emitter;
     }
 
@@ -487,15 +497,29 @@ public class TestSessionService {
     @Transactional
     public TestReportResponse report(String sessionId) {
         TestSession session = findSession(sessionId);
-        String aiReportPath = generateAiReport(sessionId);
+        String reportPath = generateAiReport(sessionId);
+        if (reportPath == null || !Files.exists(Path.of(reportPath))) {
+            reportPath = generateFallbackReport(session);
+        }
+        String finalReportPath = reportPath;
         PdfReport report = pdfReportRepository.findFirstBySessionSessionUuidOrderByCreatedAtDesc(sessionId)
                 .orElseGet(() -> pdfReportRepository.save(PdfReport.builder()
                         .session(session)
-                        .filePath(aiReportPath == null ? "/reports/" + sessionId + ".pdf" : aiReportPath)
+                        .filePath(finalReportPath)
                         .totalBugs(detectedBugRepository.countBySessionSessionUuid(sessionId))
                         .build()));
 
-        return new TestReportResponse(sessionId, report.getFilePath());
+        return new TestReportResponse(sessionId, "/api/test/" + sessionId + "/report/download");
+    }
+
+    @Transactional(readOnly = true)
+    public Path reportFile(String sessionId) {
+        TestSession session = findSession(sessionId);
+        return pdfReportRepository.findFirstBySessionSessionUuidOrderByCreatedAtDesc(sessionId)
+                .map(PdfReport::getFilePath)
+                .map(Path::of)
+                .filter(Files::exists)
+                .orElseGet(() -> Path.of(generateFallbackReport(session)));
     }
 
     @Transactional
@@ -553,35 +577,64 @@ public class TestSessionService {
     }
 
     private void runTest(String sessionId, String targetUrl) {
-        Future<?> task = executor.submit(() -> {
+        markRunning(sessionId);
+
+        CompletableFuture<Boolean> dynamicFuture = CompletableFuture.supplyAsync(
+                () -> runDynamicAnalysis(sessionId, targetUrl),
+                executor
+        );
+        CompletableFuture<Void> staticFuture = CompletableFuture.runAsync(
+                () -> runStaticAnalysis(sessionId, targetUrl),
+                executor
+        );
+        runningTasks.put(sessionId, dynamicFuture);
+
+        CompletableFuture.allOf(dynamicFuture, staticFuture).whenCompleteAsync((ignored, throwable) -> {
             try {
-                if (browserGymEnabled && runBrowserGymTest(sessionId, targetUrl)) {
+                if (dynamicFuture.isCancelled()) {
                     return;
                 }
-                if (Thread.currentThread().isInterrupted()) {
+                boolean dynamicSucceeded;
+                try {
+                    dynamicSucceeded = dynamicFuture.get();
+                } catch (Exception ignoredException) {
+                    dynamicSucceeded = false;
+                }
+
+                if (!dynamicSucceeded) {
+                    markFailed(sessionId);
+                    progressStore.put(sessionId, 0);
+                    saveBug(sessionId, null, "TEST_TARGET_UNAVAILABLE", ErrorScopeType.NETWORK, 4,
+                            "The target server could not be tested. Check that the target URL is running and reachable.");
+                    send(sessionId, "issue", StreamEvent.issue("Network",
+                            "The target server could not be tested. Check that the target URL is running and reachable.", "error"));
+                    send(sessionId, "status", StreamEvent.status("failed"));
+                    completeEmitter(sessionId);
                     return;
                 }
-                saveAction(sessionId, "Fallback", null, "BrowserGym AI unavailable; starting legacy Playwright explorer.");
-                send(sessionId, "log", StreamEvent.log("State", "BrowserGym AI unavailable; starting legacy Playwright explorer."));
-                if (runPlaywrightTest(sessionId, targetUrl)) {
-                    return;
-                }
-                if (Thread.currentThread().isInterrupted()) {
-                    return;
-                }
-                markFailed(sessionId);
-                progressStore.put(sessionId, 0);
-                saveBug(sessionId, null, "TEST_TARGET_UNAVAILABLE", ErrorScopeType.NETWORK, 4,
-                        "The target server could not be tested. Check that the target URL is running and reachable.");
-                send(sessionId, "issue", StreamEvent.issue("Network",
-                        "The target server could not be tested. Check that the target URL is running and reachable.", "error"));
-                send(sessionId, "status", StreamEvent.status("failed"));
+
+                markCompleted(sessionId);
+                progressStore.put(sessionId, 100);
+                send(sessionId, "progress", StreamEvent.progress(100));
+                send(sessionId, "status", StreamEvent.status("completed"));
+                send(sessionId, "complete", StreamEvent.complete());
                 completeEmitter(sessionId);
             } finally {
                 runningTasks.remove(sessionId);
             }
-        });
-        runningTasks.put(sessionId, task);
+        }, executor);
+    }
+
+    private boolean runDynamicAnalysis(String sessionId, String targetUrl) {
+        if (browserGymEnabled && runBrowserGymTest(sessionId, targetUrl)) {
+            return true;
+        }
+        if (Thread.currentThread().isInterrupted()) {
+            return false;
+        }
+        saveAction(sessionId, "Fallback", null, "BrowserGym AI unavailable; starting legacy Playwright explorer.");
+        send(sessionId, "log", StreamEvent.log("State", "BrowserGym AI unavailable; starting legacy Playwright explorer."));
+        return runPlaywrightTest(sessionId, targetUrl);
     }
 
     private boolean runBrowserGymTest(String sessionId, String targetUrl) {
@@ -623,12 +676,7 @@ public class TestSessionService {
                 if ("completed".equals(state)) {
                     HttpResponse<String> resultResponse = sendJson("GET", browserGymBaseUrl + "/explorations/" + jobId + "/result", null, 20);
                     persistBrowserGymResult(sessionId, objectMapper.readTree(resultResponse.body()), emittedBrowserGymFindings);
-                    markCompleted(sessionId);
-                    progressStore.put(sessionId, 100);
-                    send(sessionId, "progress", StreamEvent.progress(100));
-                    send(sessionId, "status", StreamEvent.status("completed"));
-                    send(sessionId, "complete", StreamEvent.complete());
-                    completeEmitter(sessionId);
+                    publishProgress(sessionId, 95, "State", "Dynamic analysis completed. Waiting for static analysis.");
                     return true;
                 }
                 if ("failed".equals(state) || "cancelled".equals(state)) {
@@ -893,127 +941,6 @@ public class TestSessionService {
         return runPlaywrightChildProcess(sessionId, targetUrl);
     }
 
-    private boolean runPlaywrightTestInternal(String sessionId, String targetUrl) {
-        PlaywrightExecutor playwrightExecutor = null;
-        try {
-            markRunning(sessionId);
-            publishProgress(sessionId, 5, "Navigate", "Starting Playwright exploration");
-
-            saveAction(sessionId, "Playwright", null, "Creating embedded Playwright browser");
-            send(sessionId, "log", StreamEvent.log("State", "Creating embedded Playwright browser"));
-            playwrightExecutor = new PlaywrightExecutor(true);
-            saveAction(sessionId, "Playwright", null, "Opening target URL with embedded Playwright");
-            send(sessionId, "log", StreamEvent.log("Navigate", "Opening target URL with embedded Playwright"));
-            ActionExtractor actionExtractor = new ActionExtractor();
-            StateEncoder stateEncoder = new StateEncoder();
-            RuleBasedPolicy policy = new RuleBasedPolicy();
-            StateGraph stateGraph = new StateGraph();
-            BugOracle bugOracle = new BugOracle();
-
-            playwrightExecutor.open(targetUrl);
-            Page page = playwrightExecutor.getPage();
-
-            EncodedState currentState = stateEncoder.encode(
-                    page,
-                    playwrightExecutor.getTotalConsoleErrorCount(),
-                    playwrightExecutor.getTotalNetworkErrorCount()
-            );
-            stateGraph.addState(currentState);
-            publishPlaywrightState(sessionId, currentState);
-
-            for (int step = 1; step <= playwrightMaxSteps; step++) {
-                int stepProgress = Math.min(95, 10 + (step * 80 / Math.max(1, playwrightMaxSteps)));
-                publishProgress(sessionId, stepProgress, "Action", "Playwright step " + step + " started");
-
-                List<ActionCandidate> candidates = actionExtractor.extract(page);
-                if (candidates.isEmpty()) {
-                    saveAction(sessionId, "Playwright", null, "No more executable actions were found.");
-                    send(sessionId, "log", StreamEvent.log("State", "No more executable actions were found."));
-                    break;
-                }
-
-                ActionCandidate selected = policy.select(currentState, candidates);
-                if (selected == null) {
-                    saveAction(sessionId, "Playwright", null, "No action was selected.");
-                    send(sessionId, "log", StreamEvent.log("State", "No action was selected."));
-                    break;
-                }
-
-                saveAction(sessionId, "Action", selected.getSelector(), "Selected action: " + selected);
-                send(sessionId, "log", StreamEvent.log("Action", "Selected action: " + selected));
-
-                ActionExecutionResult result = playwrightExecutor.execute(selected, currentState.getStateId());
-                EncodedState nextState = stateEncoder.encode(
-                        page,
-                        playwrightExecutor.getTotalConsoleErrorCount(),
-                        playwrightExecutor.getTotalNetworkErrorCount()
-                );
-                result.setAfterStateId(nextState.getStateId());
-
-                boolean isNewState = stateGraph.isNewState(nextState);
-                stateGraph.addState(nextState);
-                stateGraph.addEdge(currentState, selected, nextState);
-
-                String resultMessage = "success=" + result.isSuccess()
-                        + ", domChanged=" + result.isDomChanged()
-                        + ", newUrl=" + result.getNewUrl()
-                        + ", isNewState=" + isNewState;
-                saveAction(sessionId, "Playwright", null, resultMessage);
-                send(sessionId, "log", StreamEvent.log("State", resultMessage));
-
-                List<com.example.demo.model.DetectedBug> bugs = bugOracle.detect(currentState, selected, result);
-                for (com.example.demo.model.DetectedBug bug : bugs) {
-                    String detail = bug.getTitle() + ": " + bug.getDetail();
-                    saveBug(sessionId, null, "PLAYWRIGHT_" + bug.getCategory().toUpperCase(), detectScope(detail),
-                            "error".equalsIgnoreCase(bug.getSeverity()) ? 4 : 3, detail);
-                    send(sessionId, "issue", StreamEvent.issue(detectIssueLabel(detail), detail, bug.getSeverity()));
-                }
-
-                callAiPredict(
-                        sessionId,
-                        !result.getConsoleErrors().isEmpty(),
-                        0.0,
-                        0.0,
-                        isNewState,
-                        result.isSuccess()
-                );
-
-                currentState = nextState;
-                publishPlaywrightState(sessionId, currentState);
-            }
-
-            callAiPredict(sessionId, false, 0.0, 0.0, true, true);
-            markCompleted(sessionId);
-            progressStore.put(sessionId, 100);
-            send(sessionId, "progress", StreamEvent.progress(100));
-            send(sessionId, "status", StreamEvent.status("completed"));
-            send(sessionId, "complete", StreamEvent.complete());
-            completeEmitter(sessionId);
-            return true;
-        } catch (Exception e) {
-            saveAction(sessionId, "Error", null, "Playwright integration failed: " + e.getMessage());
-            send(sessionId, "log", StreamEvent.log("Error", "Playwright integration failed: " + e.getMessage()));
-            return false;
-        } finally {
-            if (playwrightExecutor != null) {
-                playwrightExecutor.close();
-            }
-        }
-    }
-
-    private void publishPlaywrightState(String sessionId, EncodedState state) {
-        String message = "pageType=" + state.getPageType()
-                + ", url=" + state.getUrl()
-                + ", title=" + state.getTitle()
-                + ", clickables=" + state.getClickableCount()
-                + ", forms=" + state.getFormCount()
-                + ", modal=" + state.isHasModal()
-                + ", consoleErrors=" + state.getConsoleErrorCount()
-                + ", networkErrors=" + state.getNetworkErrorCount();
-        saveAction(sessionId, "Playwright", null, message);
-        send(sessionId, "log", StreamEvent.log("State", message));
-    }
-
     private boolean runPlaywrightChildProcess(String sessionId, String targetUrl) {
         Process process = null;
         try {
@@ -1060,12 +987,7 @@ public class TestSessionService {
                 throw new IOException("Playwright child process exited with code " + exitCode);
             }
 
-            markCompleted(sessionId);
-            progressStore.put(sessionId, 100);
-            send(sessionId, "progress", StreamEvent.progress(100));
-            send(sessionId, "status", StreamEvent.status("completed"));
-            send(sessionId, "complete", StreamEvent.complete());
-            completeEmitter(sessionId);
+            publishProgress(sessionId, 95, "State", "Dynamic analysis completed. Waiting for static analysis.");
             return true;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -1155,6 +1077,275 @@ public class TestSessionService {
         } catch (Exception e) {
             saveAction(sessionId, "AI", null, "Unable to parse tick inference: " + e.getMessage());
         }
+    }
+
+    private void runStaticAnalysis(String sessionId, String targetUrl) {
+        if (!staticAnalysisEnabled) {
+            saveAction(sessionId, "Static", null, "Static analysis is disabled.");
+            return;
+        }
+
+        Path sourcePath = resolveStaticSourcePath(targetUrl);
+        if (sourcePath == null) {
+            String message = "No static-analysis source mapping was found for " + targetUrl + ". Dynamic analysis will continue.";
+            saveAction(sessionId, "Static", null, message);
+            send(sessionId, "log", StreamEvent.log("State", message));
+            return;
+        }
+
+        try {
+            String startMessage = "Static analysis started for " + sourcePath;
+            saveAction(sessionId, "Static", null, startMessage);
+            send(sessionId, "log", StreamEvent.log("State", startMessage));
+
+            JsonNode report = requestStaticAnalysis(sourcePath);
+            JsonNode summary = report.path("staticAnalysisSummary");
+            JsonNode issues = report.path("staticIssues");
+            int totalIssues = summary.path("totalIssuesFound").asInt(issues.isArray() ? issues.size() : 0);
+            String riskLevel = summary.path("riskLevel").asText("low");
+
+            String summaryMessage = "Static analysis completed: " + totalIssues + " issues, risk=" + riskLevel + ".";
+            saveAction(sessionId, "Static", null, summaryMessage);
+            send(sessionId, "log", StreamEvent.log("State", summaryMessage));
+
+            if (issues.isArray()) {
+                int published = 0;
+                for (JsonNode issue : issues) {
+                    saveStaticIssue(sessionId, issue);
+                    if (published < 20) {
+                        send(sessionId, "issue", StreamEvent.issue(
+                                "Static",
+                                formatStaticIssueMessage(issue),
+                                staticIssueType(issue)
+                        ));
+                        published++;
+                    }
+                }
+                if (totalIssues > published) {
+                    send(sessionId, "log", StreamEvent.log("State",
+                            "Static analysis found " + (totalIssues - published) + " additional issues saved to the session report."));
+                }
+            }
+        } catch (Exception e) {
+            String message = "Static analysis failed: " + e.getMessage();
+            saveAction(sessionId, "Static", null, message);
+            send(sessionId, "log", StreamEvent.log("Error", message));
+        }
+    }
+
+    private JsonNode requestStaticAnalysis(Path sourcePath) throws Exception {
+        try {
+            return requestStaticAnalysisServer(sourcePath);
+        } catch (Exception serverError) {
+            return requestStaticAnalysisCli(sourcePath);
+        }
+    }
+
+    private JsonNode requestStaticAnalysisServer(Path sourcePath) throws Exception {
+        if (staticAnalysisServerUrl == null || staticAnalysisServerUrl.isBlank()) {
+            throw new IllegalStateException("static analysis server URL is not configured");
+        }
+
+        String payload = objectMapper.writeValueAsString(Map.of("localPath", sourcePath.toString()));
+        HttpRequest request = HttpRequest.newBuilder(URI.create(staticAnalysisServerUrl))
+                .timeout(Duration.ofSeconds(30))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(payload))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new IOException("static analysis server returned HTTP " + response.statusCode());
+        }
+
+        JsonNode root = objectMapper.readTree(response.body());
+        if (root.path("ok").asBoolean(false)) {
+            return root.path("data");
+        }
+        if (root.has("staticAnalysisSummary")) {
+            return root;
+        }
+        throw new IOException(root.path("error").asText("static analysis server response is invalid"));
+    }
+
+    private JsonNode requestStaticAnalysisCli(Path sourcePath) throws Exception {
+        Path cliScript = resolvePath(staticAnalysisCliScript);
+        if (!Files.exists(cliScript)) {
+            throw new IOException("static analysis CLI script not found: " + cliScript);
+        }
+
+        ProcessBuilder processBuilder = new ProcessBuilder(
+                staticAnalysisNodeCommand,
+                cliScript.toString(),
+                "--path",
+                sourcePath.toString()
+        );
+        processBuilder.redirectErrorStream(true);
+
+        Process process = processBuilder.start();
+        String output;
+        try (var reader = process.inputReader(StandardCharsets.UTF_8)) {
+            output = String.join("\n", reader.lines().toList());
+        }
+
+        if (!process.waitFor(45, TimeUnit.SECONDS)) {
+            process.destroyForcibly();
+            throw new IOException("static analysis CLI timed out");
+        }
+        if (process.exitValue() != 0) {
+            throw new IOException("static analysis CLI failed: " + output);
+        }
+        return objectMapper.readTree(output);
+    }
+
+    private Path resolveStaticSourcePath(String targetUrl) {
+        String origin = targetOrigin(targetUrl);
+        if (origin == null) {
+            return null;
+        }
+
+        String configuredPath = staticSourceMappings().get(origin);
+        if (configuredPath == null) {
+            return null;
+        }
+
+        Path resolved = resolvePath(configuredPath);
+        return Files.isDirectory(resolved) ? resolved : null;
+    }
+
+    private Map<String, String> staticSourceMappings() {
+        Map<String, String> mappings = new LinkedHashMap<>();
+        if (staticAnalysisUrlSourceMap == null || staticAnalysisUrlSourceMap.isBlank()) {
+            return mappings;
+        }
+
+        for (String entry : staticAnalysisUrlSourceMap.split(";")) {
+            String trimmed = entry.trim();
+            if (trimmed.isBlank()) {
+                continue;
+            }
+            int separator = trimmed.indexOf('=');
+            if (separator <= 0 || separator >= trimmed.length() - 1) {
+                continue;
+            }
+            mappings.put(trimmed.substring(0, separator).trim(), trimmed.substring(separator + 1).trim());
+        }
+        return mappings;
+    }
+
+    private String targetOrigin(String targetUrl) {
+        try {
+            URI uri = URI.create(targetUrl);
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            int port = uri.getPort();
+            if (scheme == null || host == null) {
+                return null;
+            }
+            return port > 0 ? scheme + "://" + host + ":" + port : scheme + "://" + host;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private Path resolvePath(String value) {
+        Path path = Path.of(value);
+        if (path.isAbsolute()) {
+            return path.normalize();
+        }
+        return path.toAbsolutePath().normalize();
+    }
+
+    private void saveStaticIssue(String sessionId, JsonNode issue) {
+        transactionTemplate.executeWithoutResult(status -> {
+            TestSession session = findSession(sessionId);
+            String type = normalizeStaticType(issue.path("type").asText("static-analysis"));
+            staticIssueRepository.save(StaticIssue.builder()
+                    .session(session)
+                    .ruleId(limit(nullIfBlank(issue.path("ruleId").asText(null)), 150))
+                    .engine(limit(nullIfBlank(issue.path("engine").asText(null)), 50))
+                    .type(limit(type, 100))
+                    .severity(limit(issue.path("severity").asText("low"), 20))
+                    .confidence(limit(nullIfBlank(issue.path("confidence").asText(null)), 20))
+                    .filePath(nullIfBlank(issue.path("file").asText(null)))
+                    .lineNumber(issue.path("line").isInt() ? issue.path("line").asInt() : null)
+                    .title(nullIfBlank(issue.path("title").asText("Static analysis issue")))
+                    .description(nullIfBlank(issue.path("description").asText(null)))
+                    .recommendation(nullIfBlank(issue.path("recommendation").asText(null)))
+                    .codeSnippet(nullIfBlank(issue.path("codeSnippet").asText(null)))
+                    .relatedDynamicTypes(staticRelatedDynamicTypes(issue, type))
+                    .rawIssue(writeJson(issue))
+                    .build());
+        });
+    }
+
+    private String staticIssueType(JsonNode issue) {
+        return "high".equals(issue.path("severity").asText("low")) ? "error" : "warning";
+    }
+
+    private String formatStaticIssueMessage(JsonNode issue) {
+        String file = issue.path("file").asText("-");
+        int line = issue.path("line").asInt(1);
+        String title = issue.path("title").asText("Static analysis issue");
+        String recommendation = issue.path("recommendation").asText("");
+        String suffix = recommendation.isBlank() ? "" : " Recommendation: " + recommendation;
+        return file + ":" + line + " " + title + "." + suffix;
+    }
+
+    private String formatStaticIssueMessage(StaticIssue issue) {
+        String file = firstPresent(issue.getFilePath(), "-");
+        int line = issue.getLineNumber() == null ? 1 : issue.getLineNumber();
+        String title = firstPresent(issue.getTitle(), "Static analysis issue");
+        String recommendation = firstPresent(issue.getRecommendation(), "");
+        String suffix = recommendation.isBlank() ? "" : " Recommendation: " + recommendation;
+        return file + ":" + line + " " + title + "." + suffix;
+    }
+
+    private String staticIssueType(StaticIssue issue) {
+        return "high".equals(issue.getSeverity()) ? "error" : "warning";
+    }
+
+    private String staticRelatedDynamicTypes(JsonNode issue, String type) {
+        if (issue.has("relatedDynamicTypes")) {
+            return writeJson(issue.path("relatedDynamicTypes"));
+        }
+        return writeJson(switch (type) {
+            case "duplicate-code", "duplicated-rendering", "missing-key-risk" ->
+                    List.of("duplicated-rendering");
+            case "layout-overflow", "layout-overlap", "css-overflow-risk", "fixed-width-layout" ->
+                    List.of("layout-overflow", "layout-overlap");
+            case "hardcoded-value", "api-ui-mismatch", "inconsistent-api-shape" ->
+                    List.of("api-ui-mismatch");
+            case "missing-event-handler", "empty-function", "suspicious-onclick" ->
+                    List.of("button-no-response");
+            default -> List.of();
+        });
+    }
+
+    private String normalizeStaticType(String value) {
+        String normalized = firstPresent(value, "static-analysis")
+                .replaceAll("[^A-Za-z0-9_\\-]", "-")
+                .replaceAll("-+", "-");
+        return normalized.isBlank() ? "static-analysis" : normalized;
+    }
+
+    private String writeJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            return "{}";
+        }
+    }
+
+    private String nullIfBlank(String value) {
+        return value == null || value.isBlank() ? null : value;
+    }
+
+    private String limit(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
     }
 
     private void runMockTest(String sessionId) {
@@ -1269,6 +1460,94 @@ public class TestSessionService {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private String generateFallbackReport(TestSession session) {
+        try {
+            String sessionId = session.getSessionUuid();
+            List<String> logs = actionLogRepository.findBySessionSessionUuidOrderByCreatedAtAsc(sessionId).stream()
+                    .map(log -> "[" + nullToDash(log.getActionType()) + "] " + firstPresent(log.getInputValue(), log.getCurrentUrl()))
+                    .toList();
+            List<String> issues = detectedBugRepository.findBySessionSessionUuidOrderByIdAsc(sessionId).stream()
+                    .map(DetectedBug::getErrorMessage)
+                    .toList();
+            List<String> staticIssues = staticIssueRepository.findBySessionSessionUuidOrderByIdAsc(sessionId).stream()
+                    .map(this::formatStaticIssueMessage)
+                    .toList();
+
+            Path reportDir = Path.of("build", "reports");
+            Files.createDirectories(reportDir);
+            Path reportPath = reportDir.resolve(sessionId + ".html");
+            String html = """
+                    <!doctype html>
+                    <html lang="ko">
+                    <head>
+                      <meta charset="utf-8">
+                      <title>JAWS Test Report</title>
+                      <style>
+                        body { font-family: Arial, sans-serif; margin: 32px; color: #111827; }
+                        h1 { margin-bottom: 8px; }
+                        section { margin-top: 24px; }
+                        li { margin: 8px 0; }
+                        .meta { color: #4b5563; }
+                      </style>
+                    </head>
+                    <body>
+                      <h1>JAWS Test Report</h1>
+                      <p class="meta">Session: %s</p>
+                      <p class="meta">Target URL: %s</p>
+                      <p class="meta">Status: %s</p>
+                      <section>
+                        <h2>Detected Issues (%d)</h2>
+                        <ul>%s</ul>
+                      </section>
+                      <section>
+                        <h2>Static Analysis Issues (%d)</h2>
+                        <ul>%s</ul>
+                      </section>
+                      <section>
+                        <h2>Action Logs (%d)</h2>
+                        <ul>%s</ul>
+                      </section>
+                    </body>
+                    </html>
+                    """.formatted(
+                    escapeHtml(sessionId),
+                    escapeHtml(session.getTargetUrl()),
+                    escapeHtml(session.getStatus().name()),
+                    issues.size(),
+                    toHtmlList(issues),
+                    staticIssues.size(),
+                    toHtmlList(staticIssues),
+                    logs.size(),
+                    toHtmlList(logs)
+            );
+            Files.writeString(reportPath, html, StandardCharsets.UTF_8);
+            return reportPath.toAbsolutePath().toString();
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "fallback 리포트 생성에 실패했습니다.");
+        }
+    }
+
+    private String toHtmlList(List<String> values) {
+        if (values.isEmpty()) {
+            return "<li>수집된 항목이 없습니다.</li>";
+        }
+        return values.stream()
+                .map(value -> "<li>" + escapeHtml(value) + "</li>")
+                .reduce("", String::concat);
+    }
+
+    private String escapeHtml(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
     }
 
     private ErrorScopeType detectScope(String line) {
@@ -1418,6 +1697,39 @@ public class TestSessionService {
             emitters.remove(sessionId);
             emitter.completeWithError(e);
         }
+    }
+
+    private void replayStoredEvents(String sessionId) {
+        actionLogRepository.findBySessionSessionUuidOrderByCreatedAtAsc(sessionId)
+                .forEach(log -> send(sessionId, "log", StreamEvent.log(
+                        firstPresent(log.getActionType(), "State"),
+                        firstPresent(log.getInputValue(), log.getCurrentUrl())
+                )));
+
+        detectedBugRepository.findBySessionSessionUuidOrderByIdAsc(sessionId)
+                .forEach(issue -> send(sessionId, "issue", StreamEvent.issue(
+                        issueLabel(issue),
+                        issue.getErrorMessage(),
+                        issue.getSeverity() != null && issue.getSeverity() >= 4 ? "error" : "warning"
+                )));
+
+        staticIssueRepository.findBySessionSessionUuidOrderByIdAsc(sessionId)
+                .forEach(issue -> send(sessionId, "issue", StreamEvent.issue(
+                        "Static",
+                        formatStaticIssueMessage(issue),
+                        staticIssueType(issue)
+                )));
+    }
+
+    private String issueLabel(DetectedBug issue) {
+        String category = issue.getCategoryCode();
+        if (category != null && category.startsWith("STATIC_")) {
+            return "Static";
+        }
+        if (issue.getErrorScope() == ErrorScopeType.NETWORK) {
+            return "Network";
+        }
+        return "Error";
     }
 
     private void completeEmitter(String sessionId) {

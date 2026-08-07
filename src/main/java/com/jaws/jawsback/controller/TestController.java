@@ -11,8 +11,10 @@ import com.jaws.jawsback.dto.TestDto.TestTicksResponse;
 import com.jaws.jawsback.dto.TestDto.TestGraphResponse;
 import com.jaws.jawsback.service.TestSessionService;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -92,5 +94,15 @@ public class TestController {
         Path screenshotPath = testSessionService.screenshotPath(sessionId, fileName);
         Resource resource = new UrlResource(screenshotPath.toUri());
         return ResponseEntity.ok(resource);
+    }
+
+    @GetMapping("/{sessionId}/report/download")
+    public ResponseEntity<Resource> downloadReport(@PathVariable String sessionId) {
+        Path reportPath = testSessionService.reportFile(sessionId);
+        Resource resource = new FileSystemResource(reportPath);
+        return ResponseEntity.ok()
+                .contentType(MediaType.TEXT_HTML)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"jaws-report-" + sessionId + ".html\"")
+                .body(resource);
     }
 }
